@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>掼蛋</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;touch-action:none;overscroll-behavior:none;
+font-family:'PingFang SC','Microsoft YaHei','Hiragino Sans GB',sans-serif;
+background:#1a472a;user-select:none}
+
+#game{width:100%;height:100%;position:relative;display:flex;flex-direction:column}
+
+/* Top bar */
+.top-bar{height:36px;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:space-between;padding:0 12px;color:#cda45e;font-size:13px;flex-shrink:0}
+.top-bar .level-info{font-weight:bold}
+
+/* Play area */
+.play-area{flex:1;position:relative;overflow:hidden;min-height:0}
+
+/* Player zones */
+.player-zone{position:absolute;display:flex;flex-direction:column;align-items:center}
+.player-zone .name-tag{background:rgba(0,0,0,.5);color:#fff;padding:2px 10px;border-radius:10px;font-size:12px;white-space:nowrap;margin-bottom:2px}
+.player-zone .name-tag.team-a{border:1px solid #e8b849}
+.player-zone .name-tag.team-b{border:1px solid #5b9bd5}
+.player-zone .card-count{color:#aaa;font-size:11px}
+.player-zone .played-cards{display:flex;justify-content:center;flex-wrap:wrap;gap:1px;min-height:30px}
+
+/* Positions: 0=bottom(player), 1=right, 2=top(partner), 3=left — counterclockwise */
+.player-zone.pos-2{top:4px;left:50%;transform:translateX(-50%)}
+.player-zone.pos-1{right:8px;top:50%;transform:translateY(-60%)}
+.player-zone.pos-3{left:8px;top:50%;transform:translateY(-60%)}
+
+/* Center play area for showing played cards */
+.center-plays{position:absolute;top:50%;left:50%;transform:translate(-50%,-55%);
+display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none}
+.play-slot{display:flex;align-items:center;gap:2px;min-height:28px}
+.play-slot .slot-label{font-size:10px;color:#aaa;min-width:28px;text-align:right}
+.play-slot .slot-cards{display:flex;gap:1px;flex-wrap:wrap;justify-content:center}
+.play-slot.pass-text{color:#e8b849;font-size:14px;font-weight:bold}
+
+/* Mini cards for played cards — maximum size */
+.mini-card{background:#fff;border-radius:8px;display:inline-flex;
+flex-direction:column;align-items:center;justify-content:center;gap:2px;
+line-height:1;border:2px solid #bbb;font-weight:bold;flex-shrink:0;
+box-shadow:0 2px 6px rgba(0,0,0,.3)}
+.mini-card .mc-suit{display:block}
+.mini-card.red{color:#d32f2f}
+.mini-card.black{color:#222}
+.mini-card.joker-r{background:linear-gradient(135deg,#ff6b6b,#ee5a24);color:#fff}
+.mini-card.joker-b{background:linear-gradient(135deg,#2d3436,#636e72);color:#fff}
+
+/* Bottom hand */
+.hand-area{flex-shrink:0;background:rgba(0,0,0,.3);padding:4px 6px 0;position:relative;
+border-top:2px solid rgba(205,164,94,.4)}
+.hand-container{position:relative;overflow:hidden;padding-bottom:4px;min-height:90px;
+display:flex;align-items:flex-end;justify-content:center}
+.hand-inner{position:relative;height:78px}
+
+/* Player cards — rank/suit in top-left so overlap doesn’t hide info */
+.card{width:44px;height:64px;background:#fff;border-radius:5px;
+display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;
+padding:2px 0 0 4px;
+font-size:13px;line-height:1;border:2px solid #ddd;
+cursor:pointer;transition:top .15s,border-color .15s;
+position:absolute;top:14px;left:0}
+.card .rank{font-weight:bold;font-size:15px;line-height:1}
+.card .suit{font-size:11px;line-height:1;margin-top:0px}
+.card.red{color:#d32f2f}
+.card.black{color:#222}
+.card.joker-r{background:linear-gradient(135deg,#ff6b6b,#ee5a24);color:#fff;border-color:#d63031}
+.card.joker-b{background:linear-gradient(135deg,#2d3436,#636e72);color:#fff;border-color:#555}
+.card.selected{border-color:#e8b849;box-shadow:0 0 8px rgba(232,184,73,.6)}
+.card.wild{box-shadow:0 0 6px rgba(255,0,0,.5)}
+.card.wild::after{content:‘配’;position:absolute;top:1px;right:2px;font-size:8px;color:#ff6b6b;font-weight:bold}
+
+/* Buttons */
+.btn-bar{display:flex;justify-content:center;gap:8px;padding:6px 4px 8px;flex-shrink:0;
+background:rgba(0,0,0,.3)}
+.btn{padding:8px 20px;border:none;border-radius:20px;font-size:14px;font-weight:bold;
+cursor:pointer;transition:all .15s}
+.btn-play{background:linear-gradient(135deg,#e8b849,#d4a03c);color:#1a1a2e}
+.btn-pass{background:rgba(255,255,255,.15);color:#ccc;border:1px solid rgba(255,255,255,.2)}
+.btn-hint{background:rgba(91,155,213,.3);color:#5b9bd5;border:1px solid rgba(91,155,213,.4)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn:active:not(:disabled){transform:scale(.95)}
+
+/* Status messages */
+.status-msg{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+color:#e8b849;font-size:20px;font-weight:bold;text-shadow:0 2px 8px rgba(0,0,0,.6);
+pointer-events:none;z-index:10;text-align:center}
+
+/* Round result overlay */
+.overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);
+display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;
+color:#fff;gap:12px}
+.overlay h2{color:#e8b849;font-size:24px}
+.overlay .result-info{font-size:16px;text-align:center;line-height:1.8}
+.overlay .btn{margin-top:12px}
+.overlay.hidden{display:none}
+
+/* Type indicator */
+.type-tag{font-size:10px;color:#aaa;margin-top:1px}
+
+/* Played cards — each player’s play shown near their position */
+.played-zone{position:absolute;pointer-events:none;z-index:5;
+display:flex;flex-direction:column;align-items:center;gap:2px}
+.played-zone .pz-label{font-size:15px;color:rgba(255,255,255,.7);margin-bottom:3px;
+text-shadow:0 1px 3px rgba(0,0,0,.8);font-weight:bold}
+.played-zone .pz-cards{display:flex;justify-content:center}
+.played-zone .pz-pass{color:#e8b849;font-size:28px;font-weight:bold;
+text-shadow:0 2px 6px rgba(0,0,0,.5)}
+.pz-top{top:16%;left:50%;transform:translateX(-50%)}
+.pz-bottom{bottom:8px;left:50%;transform:translateX(-50%)}
+.pz-left{left:12px;top:38%;transform:translateY(-50%)}
+.pz-right{right:12px;top:38%;transform:translateY(-50%)}
+
+/* AI back cards */
+.ai-hand{display:flex;gap:1px}
+.back-card{width:18px;height:26px;background:linear-gradient(135deg,#2c3e50,#3498db);
+border-radius:2px;border:1px solid #1a252f}
+
+/* Animations */
+@keyframes fadeIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+.fade-in{animation:fadeIn .3s ease}
+
+/* Portrait phone optimization */
+@media(max-width:480px){
+.card{width:38px;height:56px;font-size:11px;border-radius:4px}
+.card .rank{font-size:12px}
+.card .suit{font-size:10px}
+.hand-container{min-height:76px}
+.hand-inner{height:70px}
+.mini-card{width:18px;height:25px;font-size:8px}
+.btn{padding:7px 16px;font-size:13px}
+}
+@media(max-width:360px){
+.card{width:34px;height:50px;font-size:10px}
+.card .rank{font-size:11px}
+.card .suit{font-size:9px}
+.hand-container{min-height:68px}
+.hand-inner{height:64px}
+}
+</style>
+
+</head>
+<body>
+<div id="game">
+  <div class="top-bar">
+    <span class="level-info" id="levelInfo">级牌: 2</span>
+    <span id="teamScore">我方 2 | 对方 2</span>
+    <span id="turnInfo">等待发牌...</span>
+  </div>
+  <div class="play-area" id="playArea">
+    <!-- AI top (partner, seat 2) -->
+    <div class="player-zone pos-2" id="zone2">
+      <div class="name-tag team-a" id="name2">对家</div>
+      <div class="ai-hand" id="aiHand2"></div>
+      <div class="card-count" id="count2">27张</div>
+    </div>
+    <!-- AI right (seat 1) -->
+    <div class="player-zone pos-1" id="zone1">
+      <div class="name-tag team-b" id="name1">电脑B</div>
+      <div class="ai-hand" id="aiHand1"></div>
+      <div class="card-count" id="count1">27张</div>
+    </div>
+    <!-- AI left (seat 3) -->
+    <div class="player-zone pos-3" id="zone3">
+      <div class="name-tag team-b" id="name3">电脑D</div>
+      <div class="ai-hand" id="aiHand3"></div>
+      <div class="card-count" id="count3">27张</div>
+    </div>
+    <!-- Played cards per player position -->
+    <div class="played-zone pz-top" id="played2"></div>
+    <div class="played-zone pz-left" id="played3"></div>
+    <div class="played-zone pz-right" id="played1"></div>
+    <div class="played-zone pz-bottom" id="played0"></div>
+    <div class="status-msg" id="statusMsg" style="display:none"></div>
+  </div>
+  <div class="hand-area">
+    <div class="hand-container" id="handContainer"></div>
+  </div>
+  <div class="btn-bar" id="btnBar">
+    <button class="btn btn-hint" id="btnHint" onclick="doHint()">提示</button>
+    <button class="btn btn-pass" id="btnPass" onclick="doPass()">不出</button>
+    <button class="btn btn-play" id="btnPlay" onclick="doPlay()">出牌</button>
+  </div>
+  <div class="overlay hidden" id="overlay">
+    <h2 id="resultTitle"></h2>
+    <div class="result-info" id="resultInfo"></div>
+    <button class="btn btn-play" onclick="nextRound()">下一局</button>
+  </div>
+</div>
+
+<script>
+// ========== CONSTANTS ==========
+const SUITS = ['♠','♥','♦','♣'];
+const RANKS = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+const RANK_ORDER = {'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14};
+const RANK_NAMES = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+
+// Card: {suit, rank, id} — suit='joker' for jokers, rank='BJ'/'RJ'
+let gameState = {
+  level: 2, // current level card (2-A)
+  teamALevel: 2, // player + partner
+  teamBLevel: 2,
+  hands: [[],[],[],[]], // 0=player(south), 1=right, 2=top(partner), 3=left
+  currentTrick: null, // {type, cards, rank, player}
+  currentPlayer: 0,
+  finishOrder: [],
+  roundActive: false,
+  lastPlays: [null,null,null,null], // last play per seat for display
+  consecutivePasses: 0,
+  lastPlayedBy: -1,
+  isFirstPlay: true
+};
+
+// ========== DECK & DEALING ==========
+function createDeck(){
+  let deck = [];
+  let id = 0;
+  for(let d=0;d<2;d++){
+    for(let s of SUITS){
+      for(let r of RANKS){
+        deck.push({suit:s, rank:r, id:id++});
+      }
+    }
+    deck.push({suit:'joker', rank:'BJ', id:id++});
+    deck.push({suit:'joker', rank:'RJ', id:id++});
+  }
+  return deck;
+}
+
+function shuffle(arr){
+  for(let i=arr.length-1;i>0;i--){
+    let j=Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+  }
+  return arr;
+}
+
+function deal(){
+  let deck = shuffle(createDeck());
+  for(let i=0;i<4;i++) gameState.hands[i]=[];
+  for(let i=0;i<108;i++){
+    gameState.hands[i%4].push(deck[i]);
+  }
+  for(let i=0;i<4;i++) sortHand(gameState.hands[i]);
+}
+
+function cardValue(c){
+  if(c.rank==='RJ') return 100;
+  if(c.rank==='BJ') return 99;
+  let lv = getLevelRank();
+  let v = RANK_ORDER[c.rank]||0;
+  if(c.rank === RANK_NAMES[lv-2]) v = 15.5; // level card above A
+  return v;
+}
+
+function getLevelRank(){
+  return gameState.level; // 2-14
+}
+
+function getLevelRankName(){
+  return RANK_NAMES[gameState.level - 2];
+}
+
+function isWild(c){
+  // Red heart level card is wild (逢人配)
+  return c.suit==='♥' && c.rank===getLevelRankName();
+}
+
+function sortHand(hand){
+  hand.sort((a,b)=>cardValue(b)-cardValue(a) || (a.suit>b.suit?1:-1));
+}
+
+// ========== CARD DISPLAY ==========
+function cardColor(c){
+  if(c.rank==='RJ') return 'joker-r';
+  if(c.rank==='BJ') return 'joker-b';
+  return (c.suit==='♥'||c.suit==='♦')?'red':'black';
+}
+
+function renderHand(){
+  const container=document.getElementById('handContainer');
+  container.innerHTML='';
+  const cards=gameState.hands[0];
+  const n=cards.length;
+  if(n===0) return;
+  
+  const inner=document.createElement('div');
+  inner.className='hand-inner';
+  
+  const screenW=container.clientWidth || window.innerWidth - 12;
+  let cardW=44, cardH=64;
+  if(window.innerWidth<=480){cardW=38;cardH=56;}
+  if(window.innerWidth<=360){cardW=34;cardH=50;}
+  
+  // Minimum step = 18px so rank+suit in top-left is always visible
+  const minStep=18;
+  
+  // Check if single row fits with minStep
+  let singleRowW = cardW + (n-1)*minStep;
+  
+  if(singleRowW <= screenW){
+    // Single row, use larger step
+    let step = n>1 ? Math.min(cardW+2, Math.floor((screenW - cardW) / (n - 1))) : 0;
+    let totalW = cardW + (n-1)*step;
+    inner.style.width = totalW+'px';
+    inner.style.height = (cardH+14)+'px';
+    container.style.minHeight = (cardH+18)+'px';
+    
+    cards.forEach((c,i)=>{
+      let div=makeCardDiv(c,i);
+      div.style.left = (i*step)+'px';
+      div.style.top = c._selected ? '0px' : '14px';
+      div.style.zIndex = i;
+      inner.appendChild(div);
+    });
+  } else {
+    // Two rows: split cards into top and bottom row
+    let half = Math.ceil(n/2);
+    let row1 = cards.slice(0,half); // top row (larger cards)
+    let row2 = cards.slice(half);   // bottom row (smaller cards)
+    
+    let step1 = half>1 ? Math.max(minStep, Math.floor((screenW - cardW) / (half - 1))) : 0;
+    let step2 = row2.length>1 ? Math.max(minStep, Math.floor((screenW - cardW) / (row2.length - 1))) : 0;
+    step1=Math.min(step1, cardW+2);
+    step2=Math.min(step2, cardW+2);
+    
+    let totalW1 = cardW + (half-1)*step1;
+    let totalW2 = cardW + (row2.length-1)*step2;
+    let totalW = Math.max(totalW1, totalW2);
+    
+    let rowGap = cardH * 0.45;
+    inner.style.width = totalW+'px';
+    inner.style.height = (cardH + rowGap + 14)+'px';
+    container.style.minHeight = (cardH + rowGap + 20)+'px';
+    
+    // Offset row1 for centering
+    let offset1 = Math.floor((totalW - totalW1)/2);
+    let offset2 = Math.floor((totalW - totalW2)/2);
+    
+    row1.forEach((c,i)=>{
+      let div=makeCardDiv(c,i);
+      div.style.left = (offset1 + i*step1)+'px';
+      div.style.top = '0px';
+      if(c._selected) div.style.top = '-10px';
+      div.style.zIndex = i;
+      inner.appendChild(div);
+    });
+    row2.forEach((c,i)=>{
+      let idx = half+i;
+      let div=makeCardDiv(c,idx);
+      div.style.left = (offset2 + i*step2)+'px';
+      div.style.top = rowGap+'px';
+      if(c._selected) div.style.top = (rowGap-10)+'px';
+      div.style.zIndex = 50+i;
+      inner.appendChild(div);
+    });
+  }
+  
+  container.appendChild(inner);
+}
+
+function makeCardDiv(c, idx){
+  let div=document.createElement('div');
+  div.className='card '+cardColor(c);
+  if(isWild(c)) div.classList.add('wild');
+  if(c._selected) div.classList.add('selected');
+  if(c.rank==='RJ') div.innerHTML='<span class="rank">大</span><span class="suit">王</span>';
+  else if(c.rank==='BJ') div.innerHTML='<span class="rank">小</span><span class="suit">王</span>';
+  else div.innerHTML=`<span class="rank">${c.rank}</span><span class="suit">${c.suit}</span>`;
+  div.addEventListener('click',()=>toggleCard(idx));
+  return div;
+}
+
+function toggleCard(i){
+  if(gameState.currentPlayer!==0||!gameState.roundActive) return;
+  gameState.hands[0][i]._selected=!gameState.hands[0][i]._selected;
+  renderHand();
+}
+
+function renderAIHand(seat){
+  let el=document.getElementById('aiHand'+seat);
+  let n=gameState.hands[seat].length;
+  let show=Math.min(n, 12);
+  el.innerHTML='';
+  for(let i=0;i<show;i++){
+    let d=document.createElement('div');
+    d.className='back-card';
+    el.appendChild(d);
+  }
+  document.getElementById('count'+seat).textContent=n+'张';
+}
+
+function renderMiniCards(cards){
+  // Calculate card dimensions based on count
+  // Fewer cards = bigger. Max width ~half screen for side players
+  let n = cards.length;
+  let cw, ch, fs, ss; // card width, height, font-size, suit-size
+  if(n <= 1){cw=72;ch=100;fs=32;ss=26;}
+  else if(n <= 2){cw=64;ch=90;fs=28;ss=22;}
+  else if(n <= 3){cw=58;ch=82;fs=26;ss=20;}
+  else if(n <= 5){cw=52;ch=74;fs=24;ss=18;}
+  else if(n <= 7){cw=46;ch=66;fs=21;ss=16;}
+  else{cw=40;ch=58;fs=18;ss=14;}
+  
+  // Overlap: cards overlap so total width fits ~half screen (about 180px)
+  let maxTotalW = 220;
+  let gap = n>1 ? Math.min(cw + 4, Math.floor((maxTotalW - cw)/(n-1))) : 0;
+  let ml = gap - cw; // negative margin
+  
+  return cards.map((c,i)=>{
+    let cls='mini-card '+cardColor(c);
+    let style=`width:${cw}px;height:${ch}px;font-size:${fs}px;`;
+    if(i>0) style+=`margin-left:${ml}px;`;
+    style+=`z-index:${i};position:relative;`;
+    let txt='';
+    if(c.rank==='RJ') txt=`<span>大</span><span class="mc-suit" style="font-size:${ss}px">王</span>`;
+    else if(c.rank==='BJ') txt=`<span>小</span><span class="mc-suit" style="font-size:${ss}px">王</span>`;
+    else txt=`<span>${c.rank}</span><span class="mc-suit" style="font-size:${ss}px">${c.suit}</span>`;
+    return `<div class="${cls}" style="${style}">${txt}</div>`;
+  }).join('');
+}
+
+function updateCenterDisplay(){
+  let seatNames={0:'你',1:'电脑B',2:'对家',3:'电脑D'};
+  for(let s=0;s<4;s++){
+    let el=document.getElementById('played'+s);
+    let lp=gameState.lastPlays[s];
+    if(lp===null){
+      el.innerHTML='';
+      continue;
+    }
+    let html=`<div class="pz-label">${seatNames[s]}</div>`;
+    if(lp==='pass'){
+      html+=`<div class="pz-pass">不出</div>`;
+    } else {
+      html+=`<div class="pz-cards">${renderMiniCards(lp)}</div>`;
+    }
+    el.innerHTML=html;
+  }
+}
+
+function updateUI(){
+  renderHand();
+  for(let s=1;s<=3;s++) renderAIHand(s);
+  updateCenterDisplay();
+  
+  let isMyTurn = gameState.currentPlayer===0 && gameState.roundActive;
+  document.getElementById('btnPlay').disabled=!isMyTurn;
+  document.getElementById('btnPass').disabled=!isMyTurn || gameState.isFirstPlay;
+  document.getElementById('btnHint').disabled=!isMyTurn;
+  
+  document.getElementById('turnInfo').textContent=
+    isMyTurn?'你的回合':
+    gameState.roundActive?['你','电脑B','对家','电脑D'][gameState.currentPlayer]+'出牌中...':'等待...';
+  
+  document.getElementById('levelInfo').textContent='级牌: '+getLevelRankName();
+  document.getElementById('teamScore').textContent=
+    `我方 ${levelName(gameState.teamALevel)} | 对方 ${levelName(gameState.teamBLevel)}`;
+}
+
+function levelName(lv){
+  if(lv>14) return 'A+';
+  return RANK_NAMES[lv-2]||'2';
+}
+
+// ========== CARD TYPE DETECTION ==========
+// Returns {type, rank, count, cards} or null
+function detectType(cards){
+  if(!cards||cards.length===0) return null;
+  let n=cards.length;
+  
+  // Resolve wilds: for simplicity, wilds are treated as their face value when played alone,
+  // but can substitute in combos. We'll do basic detection without wild substitution for now.
+  // (Full wild implementation is very complex)
+  
+  let vals=cards.map(c=>({v:cardValue(c), suit:c.suit, rank:c.rank, wild:isWild(c)}));
+  vals.sort((a,b)=>a.v-b.v);
+  
+  // Four kings (天王炸)
+  let jCount=cards.filter(c=>c.rank==='RJ'||c.rank==='BJ').length;
+  if(n===4 && jCount===4) return {type:'tianwang', rank:200, count:4, cards};
+  
+  // Single
+  if(n===1) return {type:'single', rank:vals[0].v, count:1, cards};
+  
+  // Pair
+  if(n===2 && vals[0].v===vals[1].v) return {type:'pair', rank:vals[0].v, count:2, cards};
+  
+  // Triple
+  if(n===3 && vals[0].v===vals[1].v && vals[1].v===vals[2].v)
+    return {type:'triple', rank:vals[0].v, count:3, cards};
+  
+  // Bomb (4-8+ same rank)
+  let rankCounts={};
+  vals.forEach(v=>{
+    let k=v.v;
+    rankCounts[k]=(rankCounts[k]||0)+1;
+  });
+  let rcEntries=Object.entries(rankCounts);
+  if(rcEntries.length===1 && n>=4)
+    return {type:'bomb', rank:vals[0].v + n*0.01, count:n, cards};
+  
+  // Three with pair (三带二): 5 cards, 3+2
+  if(n===5){
+    let counts=Object.values(rankCounts).sort();
+    if(counts.length===2 && counts[0]===2 && counts[1]===3){
+      let tripleRank=+rcEntries.find(e=>+e[1]===3)[0];
+      return {type:'triple_pair', rank:tripleRank, count:5, cards};
+    }
+  }
+  
+  // Straight (顺子): exactly 5 consecutive
+  if(n===5){
+    let sorted=[...new Set(vals.map(v=>v.v))].sort((a,b)=>a-b);
+    if(sorted.length===5 && sorted[4]-sorted[0]===4 && sorted.every(v=>v<=14)){
+      // Check same suit for flush straight (同花顺)
+      let sameSuit=vals.every(v=>v.suit===vals[0].suit);
+      if(sameSuit && !vals.some(v=>v.wild))
+        return {type:'flush_straight', rank:sorted[4]+0.001, count:5, cards};
+      return {type:'straight', rank:sorted[4], count:5, cards};
+    }
+  }
+  
+  // Three consecutive pairs (三连对): 6 cards
+  if(n===6){
+    let pairs=[];
+    for(let [k,v] of rcEntries) if(+v===2) pairs.push(+k);
+    if(pairs.length===3){
+      pairs.sort((a,b)=>a-b);
+      if(pairs[2]-pairs[0]===2 && pairs.every(v=>v<=14))
+        return {type:'triple_pair_seq', rank:pairs[2], count:6, cards};
+    }
+  }
+  
+  // Steel plate (钢板/二连三): 6 cards, 2 consecutive triples
+  if(n===6){
+    let triples=[];
+    for(let [k,v] of rcEntries) if(+v===3) triples.push(+k);
+    if(triples.length===2){
+      triples.sort((a,b)=>a-b);
+      if(triples[1]-triples[0]===1 && triples.every(v=>v<=14))
+        return {type:'plate', rank:triples[1], count:6, cards};
+    }
+  }
+  
+  return null;
+}
+
+function canBeat(play, trick){
+  if(!trick) return play!==null; // free lead
+  if(!play) return false;
+  // Tianwang beats everything
+  if(play.type==='tianwang') return true;
+  if(trick.type==='tianwang') return false;
+  // Bombs beat non-bombs
+  let playIsBomb = play.type==='bomb'||play.type==='flush_straight'||play.type==='tianwang';
+  let trickIsBomb = trick.type==='bomb'||trick.type==='flush_straight'||trick.type==='tianwang';
+  
+  if(playIsBomb && !trickIsBomb) return true;
+  if(!playIsBomb && trickIsBomb) return false;
+  
+  // Both bombs
+  if(playIsBomb && trickIsBomb){
+    // flush_straight < 4-bomb < 5-bomb < ... < tianwang
+    let pRank = play.type==='flush_straight'? play.rank - 100 : play.rank;
+    let tRank = trick.type==='flush_straight'? trick.rank - 100 : trick.rank;
+    if(play.type==='flush_straight' && trick.type!=='flush_straight' && trick.type!=='tianwang'){
+      // flush straight beats 4-bomb but loses to 5+ bomb
+      if(trick.count<=4) return true;
+      return false;
+    }
+    if(trick.type==='flush_straight' && play.type!=='flush_straight'){
+      if(play.count>=5) return true;
+      return false;
+    }
+    if(play.count!==trick.count) return play.count>trick.count;
+    return play.rank>trick.rank;
+  }
+  
+  // Same type, same count
+  if(play.type!==trick.type) return false;
+  if(play.count!==trick.count) return false;
+  return play.rank>trick.rank;
+}
+
+// ========== AI ==========
+function findAllPlays(hand, trick){
+  let plays=[];
+  let n=hand.length;
+  if(n===0) return plays;
+  
+  // Group by value
+  let groups={};
+  hand.forEach((c,i)=>{
+    let v=cardValue(c);
+    if(!groups[v]) groups[v]=[];
+    groups[v].push(i);
+  });
+  
+  let gKeys=Object.keys(groups).map(Number).sort((a,b)=>a-b);
+  
+  if(!trick){
+    // Free lead — generate all possible plays
+    // Singles
+    for(let k of gKeys) plays.push({type:'single',rank:k,count:1,indices:[groups[k][0]]});
+    // Pairs
+    for(let k of gKeys) if(groups[k].length>=2) plays.push({type:'pair',rank:k,count:2,indices:groups[k].slice(0,2)});
+    // Triples
+    for(let k of gKeys) if(groups[k].length>=3) plays.push({type:'triple',rank:k,count:3,indices:groups[k].slice(0,3)});
+    // Bombs
+    for(let k of gKeys) if(groups[k].length>=4){
+      for(let bc=4;bc<=groups[k].length;bc++)
+        plays.push({type:'bomb',rank:k+bc*0.01,count:bc,indices:groups[k].slice(0,bc)});
+    }
+    // Three+pair
+    for(let k of gKeys){
+      if(groups[k].length>=3){
+        for(let k2 of gKeys){
+          if(k2!==k && groups[k2].length>=2){
+            plays.push({type:'triple_pair',rank:k,count:5,indices:[...groups[k].slice(0,3),...groups[k2].slice(0,2)]});
+          }
+        }
+      }
+    }
+    // Straights
+    for(let i=0;i<gKeys.length-4;i++){
+      let seq=[gKeys[i]];
+      for(let j=i+1;j<gKeys.length&&seq.length<5;j++){
+        if(gKeys[j]===seq[seq.length-1]+1 && gKeys[j]<=14) seq.push(gKeys[j]);
+        else if(gKeys[j]>seq[seq.length-1]+1) break;
+      }
+      if(seq.length===5){
+        let idx=seq.map(v=>groups[v][0]);
+        plays.push({type:'straight',rank:seq[4],count:5,indices:idx});
+      }
+    }
+    // Three consecutive pairs
+    for(let i=0;i<gKeys.length-2;i++){
+      if(gKeys[i]<=14 && groups[gKeys[i]].length>=2){
+        let k1=gKeys[i],k2=k1+1,k3=k1+2;
+        if(groups[k2]&&groups[k2].length>=2&&groups[k3]&&groups[k3].length>=2&&k3<=14){
+          plays.push({type:'triple_pair_seq',rank:k3,count:6,
+            indices:[...groups[k1].slice(0,2),...groups[k2].slice(0,2),...groups[k3].slice(0,2)]});
+        }
+      }
+    }
+    // Plate (钢板)
+    for(let i=0;i<gKeys.length-1;i++){
+      if(gKeys[i]<=14 && groups[gKeys[i]].length>=3){
+        let k1=gKeys[i],k2=k1+1;
+        if(groups[k2]&&groups[k2].length>=3&&k2<=14){
+          plays.push({type:'plate',rank:k2,count:6,
+            indices:[...groups[k1].slice(0,3),...groups[k2].slice(0,3)]});
+        }
+      }
+    }
+    // Tianwang
+    let jokers=[];
+    hand.forEach((c,i)=>{if(c.rank==='RJ'||c.rank==='BJ') jokers.push(i);});
+    if(jokers.length===4) plays.push({type:'tianwang',rank:200,count:4,indices:jokers});
+    
+    return plays;
+  }
+  
+  // Must follow trick type or use bomb
+  let validPlays=[];
+  
+  // Same type plays that beat trick
+  if(trick.type==='single'){
+    for(let k of gKeys) if(k>trick.rank) validPlays.push({type:'single',rank:k,count:1,indices:[groups[k][0]]});
+  } else if(trick.type==='pair'){
+    for(let k of gKeys) if(groups[k].length>=2 && k>trick.rank)
+      validPlays.push({type:'pair',rank:k,count:2,indices:groups[k].slice(0,2)});
+  } else if(trick.type==='triple'){
+    for(let k of gKeys) if(groups[k].length>=3 && k>trick.rank)
+      validPlays.push({type:'triple',rank:k,count:3,indices:groups[k].slice(0,3)});
+  } else if(trick.type==='triple_pair'){
+    for(let k of gKeys){
+      if(groups[k].length>=3 && k>trick.rank){
+        for(let k2 of gKeys){
+          if(k2!==k && groups[k2].length>=2){
+            validPlays.push({type:'triple_pair',rank:k,count:5,indices:[...groups[k].slice(0,3),...groups[k2].slice(0,2)]});
+            break;
+          }
+        }
+      }
+    }
+  } else if(trick.type==='straight'){
+    for(let i=0;i<gKeys.length-4;i++){
+      let seq=[gKeys[i]];
+      for(let j=i+1;j<gKeys.length&&seq.length<5;j++){
+        if(gKeys[j]===seq[seq.length-1]+1&&gKeys[j]<=14) seq.push(gKeys[j]);
+        else if(gKeys[j]>seq[seq.length-1]+1) break;
+      }
+      if(seq.length===5 && seq[4]>trick.rank){
+        validPlays.push({type:'straight',rank:seq[4],count:5,indices:seq.map(v=>groups[v][0])});
+      }
+    }
+  } else if(trick.type==='triple_pair_seq'){
+    for(let i=0;i<gKeys.length-2;i++){
+      let k1=gKeys[i],k2=k1+1,k3=k1+2;
+      if(k3<=14&&k3>trick.rank&&groups[k1]&&groups[k1].length>=2&&groups[k2]&&groups[k2].length>=2&&groups[k3]&&groups[k3].length>=2){
+        validPlays.push({type:'triple_pair_seq',rank:k3,count:6,
+          indices:[...groups[k1].slice(0,2),...groups[k2].slice(0,2),...groups[k3].slice(0,2)]});
+      }
+    }
+  } else if(trick.type==='plate'){
+    for(let i=0;i<gKeys.length-1;i++){
+      let k1=gKeys[i],k2=k1+1;
+      if(k2<=14&&k2>trick.rank&&groups[k1]&&groups[k1].length>=3&&groups[k2]&&groups[k2].length>=3){
+        validPlays.push({type:'plate',rank:k2,count:6,
+          indices:[...groups[k1].slice(0,3),...groups[k2].slice(0,3)]});
+      }
+    }
+  }
+  
+  // Bombs (always can play)
+  if(trick.type!=='tianwang'){
+    // Flush straights
+    // Regular bombs
+    for(let k of gKeys){
+      if(groups[k].length>=4){
+        for(let bc=4;bc<=groups[k].length;bc++){
+          let bPlay={type:'bomb',rank:k+bc*0.01,count:bc,indices:groups[k].slice(0,bc)};
+          if(canBeat(bPlay,trick)) validPlays.push(bPlay);
+        }
+      }
+    }
+    // Tianwang
+    let jokers=[];
+    hand.forEach((c,i)=>{if(c.rank==='RJ'||c.rank==='BJ') jokers.push(i);});
+    if(jokers.length===4) validPlays.push({type:'tianwang',rank:200,count:4,indices:jokers});
+  }
+  
+  return validPlays;
+}
+
+function aiPlay(seat){
+  let hand=gameState.hands[seat];
+  let trick=gameState.currentTrick;
+  let plays=findAllPlays(hand, trick);
+  
+  if(plays.length===0) return null; // pass
+  
+  // Simple AI: pick smallest valid play, but sometimes bomb
+  // If free lead, play smallest single/pair first
+  if(!trick){
+    // Prefer non-bomb plays
+    let nonBombs=plays.filter(p=>p.type!=='bomb'&&p.type!=='tianwang'&&p.type!=='flush_straight');
+    if(nonBombs.length>0){
+      // Pick smallest
+      nonBombs.sort((a,b)=>a.rank-b.rank);
+      return nonBombs[0];
+    }
+    return plays[0];
+  }
+  
+  // Following: pick smallest that beats
+  let nonBombs=plays.filter(p=>p.type!=='bomb'&&p.type!=='tianwang'&&p.type!=='flush_straight');
+  if(nonBombs.length>0){
+    nonBombs.sort((a,b)=>a.rank-b.rank);
+    // If partner played last and is winning, maybe pass (50% chance)
+    let partnerSeat=(seat+2)%4;
+    if(gameState.lastPlayedBy===partnerSeat && Math.random()>0.5) return null;
+    return nonBombs[0];
+  }
+  
+  // Only bombs available — use if few cards left or opponent is close to winning
+  let opponents = seat%2===0?[1,3]:[0,2];
+  let oppClose = opponents.some(o=>gameState.hands[o].length<=5);
+  if(oppClose || hand.length<=8){
+    plays.sort((a,b)=>a.rank-b.rank);
+    return plays[0];
+  }
+  
+  return null; // pass, save bombs
+}
+
+// ========== GAME FLOW ==========
+function startRound(){
+  deal();
+  gameState.currentTrick=null;
+  gameState.currentPlayer=0;
+  gameState.finishOrder=[];
+  gameState.roundActive=true;
+  gameState.lastPlays=[null,null,null,null];
+  gameState.consecutivePasses=0;
+  gameState.lastPlayedBy=-1;
+  gameState.isFirstPlay=true;
+  
+  document.getElementById('overlay').classList.add('hidden');
+  updateUI();
+  
+  if(gameState.currentPlayer!==0) setTimeout(()=>aiTurn(),800);
+}
+
+function nextSeat(seat){
+  // Counterclockwise from player's view: 0(bottom)->1(right)->2(top)->3(left)->0
+  let next=(seat+1)%4;
+  // Skip finished players
+  let tried=0;
+  while(gameState.finishOrder.includes(next)&&tried<4){
+    next=(next+1)%4;
+    tried++;
+  }
+  return next;
+}
+
+function removeCards(seat, indices){
+  indices.sort((a,b)=>b-a);
+  let removed=[];
+  for(let i of indices) removed.push(gameState.hands[seat].splice(i,1)[0]);
+  return removed;
+}
+
+function executePlay(seat, play){
+  let cards;
+  if(play){
+    cards=removeCards(seat, play.indices);
+    gameState.currentTrick={type:play.type, rank:play.rank, count:play.count, cards:cards, player:seat};
+    gameState.lastPlays[seat]=cards;
+    gameState.consecutivePasses=0;
+    gameState.lastPlayedBy=seat;
+    gameState.isFirstPlay=false;
+    
+    // Check if player finished
+    if(gameState.hands[seat].length===0){
+      gameState.finishOrder.push(seat);
+      // Check end: 3 players finished or both of one team finished
+      if(checkRoundEnd()) return;
+    }
+  } else {
+    // Pass
+    gameState.lastPlays[seat]='pass';
+    gameState.consecutivePasses++;
+    
+    // Count active players (not finished)
+    let activePlayers = [0,1,2,3].filter(s=>!gameState.finishOrder.includes(s));
+    let passThreshold = activePlayers.length - 1;
+    
+    if(gameState.consecutivePasses >= passThreshold){
+      // Everyone passed, trick winner leads
+      gameState.currentTrick=null;
+      gameState.lastPlays=[null,null,null,null];
+      gameState.consecutivePasses=0;
+      gameState.isFirstPlay=true;
+      
+      // Find next player from lastPlayedBy
+      let leader = gameState.lastPlayedBy;
+      if(gameState.finishOrder.includes(leader)){
+        // 借风: partner leads
+        let partner=(leader+2)%4;
+        if(!gameState.finishOrder.includes(partner)) leader=partner;
+        else leader=nextSeat(leader);
+      }
+      gameState.currentPlayer=leader;
+      updateUI();
+      if(leader!==0) setTimeout(()=>aiTurn(),800);
+      return;
+    }
+  }
+  
+  // Next player
+  gameState.currentPlayer=nextSeat(seat);
+  updateUI();
+  if(gameState.currentPlayer!==0 && gameState.roundActive) setTimeout(()=>aiTurn(),600);
+}
+
+function checkRoundEnd(){
+  let fo=gameState.finishOrder;
+  // Both from same team finished
+  if(fo.length>=2){
+    let teamA=[0,2], teamB=[1,3];
+    let aFinished=teamA.filter(s=>fo.includes(s)).length;
+    let bFinished=teamB.filter(s=>fo.includes(s)).length;
+    if(aFinished===2||bFinished===2||fo.length>=3){
+      endRound();
+      return true;
+    }
+  }
+  if(fo.length>=3){
+    endRound();
+    return true;
+  }
+  return false;
+}
+
+function endRound(){
+  gameState.roundActive=false;
+  // Fill remaining
+  let remaining=[0,1,2,3].filter(s=>!gameState.finishOrder.includes(s));
+  gameState.finishOrder.push(...remaining);
+  
+  let fo=gameState.finishOrder;
+  let first=fo[0], second=fo[1];
+  let firstTeamA = first%2===0;
+  let secondTeamA = second%2===0;
+  
+  let upgrade=0;
+  let winnerIsA=firstTeamA;
+  
+  if(firstTeamA===secondTeamA){
+    // Same team got 1st and 2nd — 双上
+    upgrade=3;
+  } else {
+    // 1st team gets upgrade based on partner position
+    let partner=(first+2)%4;
+    let partnerPos=fo.indexOf(partner);
+    if(partnerPos===1) upgrade=3;
+    else if(partnerPos===2) upgrade=2;
+    else upgrade=1;
+  }
+  
+  if(winnerIsA){
+    gameState.teamALevel=Math.min(14, gameState.teamALevel+upgrade);
+    gameState.level=gameState.teamALevel;
+  } else {
+    gameState.teamBLevel=Math.min(14, gameState.teamBLevel+upgrade);
+    gameState.level=gameState.teamBLevel;
+  }
+  
+  let posNames=['头游','二游','三游','末游'];
+  let seatNames={0:'你',1:'电脑B',2:'对家',3:'电脑D'};
+  let resultLines=fo.map((s,i)=>`${posNames[i]}: ${seatNames[s]}`).join('<br>');
+  
+  let title = winnerIsA ? '🎉 我方获胜！' : '😞 对方获胜';
+  let upgradeText = `升${upgrade}级`;
+  
+  document.getElementById('resultTitle').textContent=title;
+  document.getElementById('resultInfo').innerHTML=resultLines+'<br><br>'+
+    (winnerIsA?'我方':'对方')+upgradeText+'<br>'+
+    `我方级牌: ${levelName(gameState.teamALevel)} | 对方级牌: ${levelName(gameState.teamBLevel)}`;
+  document.getElementById('overlay').classList.remove('hidden');
+}
+
+function aiTurn(){
+  if(!gameState.roundActive) return;
+  let seat=gameState.currentPlayer;
+  if(seat===0) return;
+  
+  let play=aiPlay(seat);
+  executePlay(seat, play);
+}
+
+// ========== PLAYER ACTIONS ==========
+function doPlay(){
+  if(gameState.currentPlayer!==0||!gameState.roundActive) return;
+  let selected=[];
+  gameState.hands[0].forEach((c,i)=>{if(c._selected) selected.push(i);});
+  if(selected.length===0) return;
+  
+  let cards=selected.map(i=>gameState.hands[0][i]);
+  let playType=detectType(cards);
+  
+  if(!playType){
+    showMsg('无效牌型！');
+    return;
+  }
+  
+  if(gameState.currentTrick){
+    if(!canBeat(playType, gameState.currentTrick)){
+      showMsg('打不过！');
+      return;
+    }
+  }
+  
+  // Clear selections
+  gameState.hands[0].forEach(c=>c._selected=false);
+  executePlay(0, {type:playType.type, rank:playType.rank, count:playType.count, indices:selected});
+}
+
+function doPass(){
+  if(gameState.currentPlayer!==0||!gameState.roundActive||gameState.isFirstPlay) return;
+  if(!gameState.currentTrick){
+    showMsg('必须出牌！');
+    return;
+  }
+  gameState.hands[0].forEach(c=>c._selected=false);
+  executePlay(0, null);
+}
+
+function doHint(){
+  if(gameState.currentPlayer!==0||!gameState.roundActive) return;
+  let hand=gameState.hands[0];
+  let plays=findAllPlays(hand, gameState.currentTrick);
+  
+  if(plays.length===0){
+    showMsg('没有可出的牌');
+    return;
+  }
+  
+  // Clear current selection
+  hand.forEach(c=>c._selected=false);
+  
+  // Cycle through hints
+  if(!window._hintIdx) window._hintIdx=0;
+  window._hintIdx=window._hintIdx % plays.length;
+  
+  let play=plays[window._hintIdx];
+  play.indices.forEach(i=>hand[i]._selected=true);
+  window._hintIdx++;
+  
+  renderHand();
+}
+
+function showMsg(text){
+  let el=document.getElementById('statusMsg');
+  el.textContent=text;
+  el.style.display='block';
+  setTimeout(()=>{el.style.display='none';},1200);
+}
+
+function nextRound(){
+  startRound();
+}
+
+// ========== INIT ==========
+startRound();
+</script>
+
+</body>
+</html>
