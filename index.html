@@ -1,10 +1,9 @@
 <!DOCTYPE html>
-
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>掼蛋</title>
+<title>掼蛋 - 逻辑优化版</title>
 <style>
 *, *::before, *::after {
   margin: 0; padding: 0; box-sizing: border-box;
@@ -46,8 +45,8 @@ font-size: 11px; white-space: nowrap; margin-bottom: 2px;
 .name-tag.team-b { border: 1px solid #5b9bd5; }
 .player-zone .card-count { color: #aaa; font-size: 10px; margin-top: 1px; }
 .player-zone.pos-top { top: 2px; left: 50%; transform: translateX(-50%); }
-.player-zone.pos-right { right: 6px; top: 48%; transform: translateY(-50%); }
-.player-zone.pos-left { left: 6px; top: 48%; transform: translateY(-50%); }
+.player-zone.pos-right { right: 4px; top: 50%; transform: translateY(-50%); }
+.player-zone.pos-left { left: 4px; top: 50%; transform: translateY(-50%); }
 
 /* === AI HAND DISPLAY === */
 .ai-hand-wrap { overflow: hidden; }
@@ -90,10 +89,10 @@ text-shadow: 0 1px 3px rgba(0,0,0,0.8);
 color: #e8b849; font-size: 26px; font-weight: bold;
 text-shadow: 0 2px 6px rgba(0,0,0,0.5);
 }
-.played-top { top: 15%; left: 50%; transform: translateX(-50%); }
+.played-top { top: 16%; left: 50%; transform: translateX(-50%); }
 .played-bottom { bottom: 6px; left: 50%; transform: translateX(-50%); }
-.played-left { left: 10px; top: 35%; }
-.played-right { right: 10px; top: 35%; }
+.played-left { left: 50%; top: 38%; transform: translate(-110%, -50%); }
+.played-right { left: 50%; top: 38%; transform: translate(10%, -50%); }
 
 /* === MINI CARDS (played area) === */
 .mini-card {
@@ -152,7 +151,7 @@ box-shadow: 0 0 8px rgba(232,184,73,0.6);
 box-shadow: inset 0 0 0 1px rgba(255,0,0,0.4);
 }
 .player-card.wild-card::after {
-content: ‘配’; position: absolute; bottom: 2px; right: 2px;
+content: '配'; position: absolute; bottom: 2px; right: 2px;
 font-size: 7px; color: #ff6b6b; font-weight: bold;
 }
 
@@ -181,8 +180,9 @@ border: 1px solid rgba(91,155,213,0.4);
 .btn-cheat {
 background: rgba(255,255,255,0.08); color: #888;
 border: 1px solid rgba(255,255,255,0.15);
-font-size: 15px; padding: 7px 11px;
-position: absolute; right: 8px;
+font-size: 13px; padding: 6px 10px;
+position: absolute; right: 6px; top: 50%;
+-webkit-transform: translateY(-50%); transform: translateY(-50%);
 }
 .btn-cheat.active { background: rgba(232,184,73,0.25); color: #e8b849; border-color: #e8b849; }
 .game-btn:disabled { opacity: 0.4; cursor: default; }
@@ -215,7 +215,6 @@ color: #fff; gap: 10px;
 .hand-inner { height: 68px; }
 }
 </style>
-
 </head>
 <body>
 <div id="game">
@@ -292,14 +291,6 @@ color: #fff; gap: 10px;
         gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
         osc.connect(gain); gain.connect(ctx.destination);
         osc.start(now); osc.stop(now + 0.1);
-        buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.03), ctx.sampleRate);
-        data = buf.getChannelData(0);
-        for (var i = 0; i < data.length; i++) {
-          data[i] = (Math.random() * 2 - 1) * Math.exp(-i / 300);
-        }
-        src = ctx.createBufferSource(); gain2 = ctx.createGain();
-        src.buffer = buf; gain2.gain.setValueAtTime(0.4, now);
-        src.connect(gain2); gain2.connect(ctx.destination); src.start(now);
       }
       else if (type === "pass") {
         osc = ctx.createOscillator(); gain = ctx.createGain();
@@ -320,14 +311,6 @@ color: #fff; gap: 10px;
         gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
         osc.connect(gain); gain.connect(ctx.destination);
         osc.start(now); osc.stop(now + 0.35);
-        buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.15), ctx.sampleRate);
-        data = buf.getChannelData(0);
-        for (var j = 0; j < data.length; j++) {
-          data[j] = (Math.random() * 2 - 1) * Math.exp(-j / 2000);
-        }
-        src = ctx.createBufferSource(); gain2 = ctx.createGain();
-        src.buffer = buf; gain2.gain.setValueAtTime(0.3, now);
-        src.connect(gain2); gain2.connect(ctx.destination); src.start(now);
       }
       else if (type === "win") {
         var freqs = [523, 659, 784, 1047];
@@ -344,11 +327,10 @@ color: #fff; gap: 10px;
   }
 
   // ==================== CONSTANTS ====================
-  var SUITS = ["\u2660", "\u2665", "\u2666", "\u2663"]; // spade heart diamond club
+  var SUITS = ["♠", "♥", "♦", "♣"];
   var RANKS = ["2","3","4","5","6","7","8","9","10","J","Q","K","A"];
   var RANK_ORDER = {"2":2,"3":3,"4":4,"5":5,"6":6,"7":7,"8":8,"9":9,"10":10,"J":11,"Q":12,"K":13,"A":14};
-  var SEAT_NAMES = {0:"\u4f60", 1:"\u7535\u8111B", 2:"\u5bf9\u5bb6", 3:"\u7535\u8111D"};
-  // 你, 电脑B, 对家, 电脑D
+  var SEAT_NAMES = {0:"你", 1:"电脑B", 2:"对家", 3:"电脑D"};
 
   var cheatMode = false;
   var hintIndex = 0;
@@ -359,7 +341,8 @@ color: #fff; gap: 10px;
     currentTrick: null, currentPlayer: 0,
     finishOrder: [], roundActive: false,
     lastPlays: [null, null, null, null],
-    consecutivePasses: 0, lastPlayedBy: -1, isFirstPlay: true
+    consecutivePasses: 0, lastPlayedBy: -1, isFirstPlay: true,
+    playedCards: [] 
   };
 
   // ==================== DECK ====================
@@ -406,7 +389,7 @@ color: #fff; gap: 10px;
   }
 
   function isWild(card) {
-    return card.suit === "\u2665" && card.rank === getLevelRankName();
+    return card.suit === "♥" && card.rank === getLevelRankName();
   }
 
   function sortHand(hand) {
@@ -420,7 +403,7 @@ color: #fff; gap: 10px;
   function getCardColor(card) {
     if (card.rank === "RJ") return "color-joker-red";
     if (card.rank === "BJ") return "color-joker-black";
-    if (card.suit === "\u2665" || card.suit === "\u2666") return "color-red";
+    if (card.suit === "♥" || card.suit === "♦") return "color-red";
     return "color-black";
   }
 
@@ -499,9 +482,9 @@ color: #fff; gap: 10px;
     if (isWild(card)) div.className += " wild-card";
     if (card._selected) div.className += " selected";
     if (card.rank === "RJ") {
-      div.innerHTML = '<span class="card-rank">\u5927</span><span class="card-suit">\u738b</span>';
+      div.innerHTML = '<span class="card-rank">大</span><span class="card-suit">王</span>';
     } else if (card.rank === "BJ") {
-      div.innerHTML = '<span class="card-rank">\u5c0f</span><span class="card-suit">\u738b</span>';
+      div.innerHTML = '<span class="card-rank">小</span><span class="card-suit">王</span>';
     } else {
       div.innerHTML = '<span class="card-rank">' + card.rank + '</span><span class="card-suit">' + card.suit + '</span>';
     }
@@ -541,9 +524,9 @@ color: #fff; gap: 10px;
           cdiv.style.left = (c * stepVal) + "px";
           cdiv.style.zIndex = String(c);
           if (card.rank === "RJ") {
-            cdiv.innerHTML = '<span class="cheat-rank">\u5927</span><span class="cheat-suit">\u738b</span>';
+            cdiv.innerHTML = '<span class="cheat-rank">大</span><span class="cheat-suit">王</span>';
           } else if (card.rank === "BJ") {
-            cdiv.innerHTML = '<span class="cheat-rank">\u5c0f</span><span class="cheat-suit">\u738b</span>';
+            cdiv.innerHTML = '<span class="cheat-rank">小</span><span class="cheat-suit">王</span>';
           } else {
             cdiv.innerHTML = '<span class="cheat-rank">' + card.rank + '</span><span class="cheat-suit">' + card.suit + '</span>';
           }
@@ -562,7 +545,7 @@ color: #fff; gap: 10px;
       }
       el.appendChild(backRow);
     }
-    document.getElementById("count" + seat).textContent = n + "\u5f20";
+    document.getElementById("count" + seat).textContent = n + "张";
   }
 
   function renderMiniCards(cards) {
@@ -587,9 +570,9 @@ color: #fff; gap: 10px;
       style += "z-index:" + i + ";position:relative;";
       var inner = "";
       if (card.rank === "RJ") {
-        inner = '<span>\u5927</span><span class="mini-suit" style="font-size:' + ss + 'px">\u738b</span>';
+        inner = '<span>大</span><span class="mini-suit" style="font-size:' + ss + 'px">王</span>';
       } else if (card.rank === "BJ") {
-        inner = '<span>\u5c0f</span><span class="mini-suit" style="font-size:' + ss + 'px">\u738b</span>';
+        inner = '<span>小</span><span class="mini-suit" style="font-size:' + ss + 'px">王</span>';
       } else {
         inner = '<span>' + card.rank + '</span><span class="mini-suit" style="font-size:' + ss + 'px">' + card.suit + '</span>';
       }
@@ -605,7 +588,7 @@ color: #fff; gap: 10px;
       if (lp === null) { el.innerHTML = ""; continue; }
       var h = '<div class="play-label">' + SEAT_NAMES[s] + '</div>';
       if (lp === "pass") {
-        h += '<div class="play-pass">\u4e0d\u51fa</div>';
+        h += '<div class="play-pass">不出</div>';
       } else {
         h += '<div class="play-cards">' + renderMiniCards(lp) + '</div>';
       }
@@ -622,11 +605,11 @@ color: #fff; gap: 10px;
     document.getElementById("btnPass").disabled = !isMyTurn || gameState.isFirstPlay;
     document.getElementById("btnHint").disabled = !isMyTurn;
     document.getElementById("turnInfo").textContent =
-      isMyTurn ? "\u4f60\u7684\u56de\u5408" :
-      gameState.roundActive ? SEAT_NAMES[gameState.currentPlayer] + "\u51fa\u724c\u4e2d..." : "\u7b49\u5f85...";
-    document.getElementById("levelInfo").textContent = "\u7ea7\u724c: " + getLevelRankName();
+      isMyTurn ? "你的回合" :
+      gameState.roundActive ? SEAT_NAMES[gameState.currentPlayer] + "出牌中..." : "等待...";
+    document.getElementById("levelInfo").textContent = "级牌: " + getLevelRankName();
     document.getElementById("teamScore").textContent =
-      "\u6211\u65b9 " + levelName(gameState.teamALevel) + " | \u5bf9\u65b9 " + levelName(gameState.teamBLevel);
+      "我方 " + levelName(gameState.teamALevel) + " | 对方 " + levelName(gameState.teamBLevel);
   }
 
   // ==================== CARD TYPE DETECTION ====================
@@ -639,7 +622,6 @@ color: #fff; gap: 10px;
     }
     vals.sort(function(a, b) { return a.v - b.v; });
 
-    // Tianwang (4 jokers)
     if (n === 4) {
       var jokerCount = 0;
       for (var j = 0; j < cards.length; j++) {
@@ -655,10 +637,8 @@ color: #fff; gap: 10px;
     }
     var wc = wilds.length;
 
-    // Single
     if (n === 1) return { type: "single", rank: vals[0].v, count: 1, cards: cards };
 
-    // Group normals by value
     var normGroups = {};
     for (var ng = 0; ng < normals.length; ng++) {
       var nv = normals[ng].v;
@@ -666,22 +646,18 @@ color: #fff; gap: 10px;
     }
     var normKeys = Object.keys(normGroups).map(Number).sort(function(a,b){return a-b;});
 
-    // Pair
     if (n === 2) {
       if (wc === 0 && normals[0].v === normals[1].v) return { type: "pair", rank: normals[0].v, count: 2, cards: cards };
       if (wc >= 1 && normals.length >= 1) return { type: "pair", rank: normals[0].v, count: 2, cards: cards };
       if (wc === 2) return { type: "pair", rank: vals[0].v, count: 2, cards: cards };
     }
 
-    // Triple
     if (n === 3) {
       for (var tk = 0; tk < normKeys.length; tk++) {
         if ((normGroups[normKeys[tk]] || 0) + wc >= 3) return { type: "triple", rank: normKeys[tk], count: 3, cards: cards };
       }
-      if (wc >= 2 && normals.length >= 1) return { type: "triple", rank: normals[normals.length - 1].v, count: 3, cards: cards };
     }
 
-    // All-value counts
     var allCounts = {};
     for (var ac = 0; ac < vals.length; ac++) {
       allCounts[vals[ac].v] = (allCounts[vals[ac].v] || 0) + 1;
@@ -691,11 +667,9 @@ color: #fff; gap: 10px;
       if (allCounts.hasOwnProperty(key)) allEntries.push([Number(key), allCounts[key]]);
     }
 
-    // Bomb (all same, no wilds, 4+)
     if (allEntries.length === 1 && n >= 4 && wc === 0) {
       return { type: "bomb", rank: vals[0].v + n * 0.01, count: n, cards: cards };
     }
-    // Bomb with wilds
     if (normals.length > 0 && wc > 0 && n >= 4) {
       var allSameNorm = true;
       for (var bn = 1; bn < normals.length; bn++) {
@@ -704,7 +678,6 @@ color: #fff; gap: 10px;
       if (allSameNorm) return { type: "bomb", rank: normals[0].v + n * 0.01, count: n, cards: cards };
     }
 
-    // Three + Pair (5 cards)
     if (n === 5) {
       if (wc === 0) {
         var countVals = [];
@@ -734,7 +707,6 @@ color: #fff; gap: 10px;
       }
     }
 
-    // Straight (exactly 5 consecutive, values <= 14)
     if (n === 5) {
       for (var start = 2; start <= 10; start++) {
         var needed = 0;
@@ -759,7 +731,6 @@ color: #fff; gap: 10px;
       }
     }
 
-    // Three consecutive pairs (6 cards, no wilds)
     if (n === 6 && wc === 0) {
       var pairVals = [];
       for (var pv = 0; pv < allEntries.length; pv++) {
@@ -773,7 +744,6 @@ color: #fff; gap: 10px;
       }
     }
 
-    // Steel plate (6 cards, no wilds)
     if (n === 6 && wc === 0) {
       var tripleVals = [];
       for (var tv = 0; tv < allEntries.length; tv++) {
@@ -795,13 +765,12 @@ color: #fff; gap: 10px;
     if (!play) return false;
     if (play.type === "tianwang") return true;
     if (trick.type === "tianwang") return false;
-    var pBomb = (play.type === "bomb" || play.type === "flush_straight" || play.type === "tianwang");
-    var tBomb = (trick.type === "bomb" || trick.type === "flush_straight" || trick.type === "tianwang");
+    var pBomb = (play.type === "bomb" || play.type === "flush_straight");
+    var tBomb = (trick.type === "bomb" || trick.type === "flush_straight");
     if (pBomb && !tBomb) return true;
     if (!pBomb && tBomb) return false;
     if (pBomb && tBomb) {
-      if (play.type === "flush_straight" && trick.type !== "flush_straight" && trick.type !== "tianwang") return trick.count <= 4;
-      if (trick.type === "flush_straight" && play.type !== "flush_straight") return play.count >= 5;
+      if (play.type === "flush_straight" && trick.type !== "flush_straight") return true; 
       if (play.count !== trick.count) return play.count > trick.count;
       return play.rank > trick.rank;
     }
@@ -823,22 +792,16 @@ color: #fff; gap: 10px;
     var gKeys = Object.keys(groups).map(Number).sort(function(a,b){return a-b;});
 
     if (!trick) {
-      // Singles
       for (var s = 0; s < gKeys.length; s++) plays.push({type:"single",rank:gKeys[s],count:1,indices:[groups[gKeys[s]][0]]});
-      // Pairs
       for (var p = 0; p < gKeys.length; p++) if (groups[gKeys[p]].length >= 2) plays.push({type:"pair",rank:gKeys[p],count:2,indices:groups[gKeys[p]].slice(0,2)});
-      // Triples
       for (var t = 0; t < gKeys.length; t++) if (groups[gKeys[t]].length >= 3) plays.push({type:"triple",rank:gKeys[t],count:3,indices:groups[gKeys[t]].slice(0,3)});
-      // Bombs
       for (var b = 0; b < gKeys.length; b++) if (groups[gKeys[b]].length >= 4)
         for (var bc = 4; bc <= groups[gKeys[b]].length; bc++)
           plays.push({type:"bomb",rank:gKeys[b]+bc*0.01,count:bc,indices:groups[gKeys[b]].slice(0,bc)});
-      // Three+pair
       for (var tp1 = 0; tp1 < gKeys.length; tp1++) if (groups[gKeys[tp1]].length >= 3)
         for (var tp2 = 0; tp2 < gKeys.length; tp2++) if (gKeys[tp2] !== gKeys[tp1] && groups[gKeys[tp2]].length >= 2) {
           plays.push({type:"triple_pair",rank:gKeys[tp1],count:5,indices:groups[gKeys[tp1]].slice(0,3).concat(groups[gKeys[tp2]].slice(0,2))});
         }
-      // Straights
       for (var si = 0; si < gKeys.length; si++) {
         if (gKeys[si] > 14) continue;
         var seq = [gKeys[si]];
@@ -847,216 +810,148 @@ color: #fff; gap: 10px;
           if (gKeys[sj] === seq[seq.length-1]+1) seq.push(gKeys[sj]);
           else if (gKeys[sj] > seq[seq.length-1]+1) break;
         }
-        if (seq.length === 5 && seq[4] <= 14) {
+        if (seq.length === 5) {
           var idx = [];
           for (var sq = 0; sq < seq.length; sq++) idx.push(groups[seq[sq]][0]);
           plays.push({type:"straight",rank:seq[4],count:5,indices:idx});
         }
       }
-      // Three consecutive pairs
-      for (var cp1 = 0; cp1 < gKeys.length; cp1++) {
-        var k1 = gKeys[cp1]; if (k1 > 14) continue;
-        if (groups[k1] && groups[k1].length >= 2 && groups[k1+1] && groups[k1+1].length >= 2 && groups[k1+2] && groups[k1+2].length >= 2 && k1+2 <= 14) {
-          plays.push({type:"triple_pair_seq",rank:k1+2,count:6,indices:groups[k1].slice(0,2).concat(groups[k1+1].slice(0,2)).concat(groups[k1+2].slice(0,2))});
-        }
-      }
-      // Plate
-      for (var pl1 = 0; pl1 < gKeys.length; pl1++) {
-        var pk = gKeys[pl1]; if (pk > 14) continue;
-        if (groups[pk] && groups[pk].length >= 3 && groups[pk+1] && groups[pk+1].length >= 3 && pk+1 <= 14) {
-          plays.push({type:"plate",rank:pk+1,count:6,indices:groups[pk].slice(0,3).concat(groups[pk+1].slice(0,3))});
-        }
-      }
-      // Tianwang
-      var jokers = [];
-      for (var jk = 0; jk < hand.length; jk++) { if (hand[jk].rank === "RJ" || hand[jk].rank === "BJ") jokers.push(jk); }
-      if (jokers.length === 4) plays.push({type:"tianwang",rank:200,count:4,indices:jokers});
       return plays;
     }
 
-    // Following a trick
     var validPlays = [];
     var tType = trick.type;
     var tRank = trick.rank;
+    var tCount = trick.count;
 
-    if (tType === "single") {
-      for (var fs = 0; fs < gKeys.length; fs++) if (gKeys[fs] > tRank) validPlays.push({type:"single",rank:gKeys[fs],count:1,indices:[groups[gKeys[fs]][0]]});
-    } else if (tType === "pair") {
-      for (var fp = 0; fp < gKeys.length; fp++) if (groups[gKeys[fp]].length >= 2 && gKeys[fp] > tRank) validPlays.push({type:"pair",rank:gKeys[fp],count:2,indices:groups[gKeys[fp]].slice(0,2)});
-    } else if (tType === "triple") {
-      for (var ft = 0; ft < gKeys.length; ft++) if (groups[gKeys[ft]].length >= 3 && gKeys[ft] > tRank) validPlays.push({type:"triple",rank:gKeys[ft],count:3,indices:groups[gKeys[ft]].slice(0,3)});
-    } else if (tType === "triple_pair") {
-      for (var ftp = 0; ftp < gKeys.length; ftp++) if (groups[gKeys[ftp]].length >= 3 && gKeys[ftp] > tRank)
-        for (var ftp2 = 0; ftp2 < gKeys.length; ftp2++) if (gKeys[ftp2] !== gKeys[ftp] && groups[gKeys[ftp2]].length >= 2) {
-          validPlays.push({type:"triple_pair",rank:gKeys[ftp],count:5,indices:groups[gKeys[ftp]].slice(0,3).concat(groups[gKeys[ftp2]].slice(0,2))});
-          break;
-        }
-    } else if (tType === "straight") {
-      for (var fsi = 0; fsi < gKeys.length; fsi++) {
-        if (gKeys[fsi] > 14) continue;
-        var fseq = [gKeys[fsi]];
-        for (var fsj = fsi+1; fsj < gKeys.length && fseq.length < 5; fsj++) {
-          if (gKeys[fsj] > 14) continue;
-          if (gKeys[fsj] === fseq[fseq.length-1]+1) fseq.push(gKeys[fsj]);
-          else if (gKeys[fsj] > fseq[fseq.length-1]+1) break;
-        }
-        if (fseq.length === 5 && fseq[4] <= 14 && fseq[4] > tRank) {
-          var fidx = [];
-          for (var fsq = 0; fsq < fseq.length; fsq++) fidx.push(groups[fseq[fsq]][0]);
-          validPlays.push({type:"straight",rank:fseq[4],count:5,indices:fidx});
-        }
-      }
-    } else if (tType === "triple_pair_seq") {
-      for (var fcp = 0; fcp < gKeys.length; fcp++) {
-        var fk = gKeys[fcp]; if (fk > 14) continue;
-        if (fk+2 <= 14 && fk+2 > tRank && groups[fk] && groups[fk].length >= 2 && groups[fk+1] && groups[fk+1].length >= 2 && groups[fk+2] && groups[fk+2].length >= 2) {
-          validPlays.push({type:"triple_pair_seq",rank:fk+2,count:6,indices:groups[fk].slice(0,2).concat(groups[fk+1].slice(0,2)).concat(groups[fk+2].slice(0,2))});
-        }
-      }
-    } else if (tType === "plate") {
-      for (var fpl = 0; fpl < gKeys.length; fpl++) {
-        var fpk = gKeys[fpl]; if (fpk > 14) continue;
-        if (fpk+1 <= 14 && fpk+1 > tRank && groups[fpk] && groups[fpk].length >= 3 && groups[fpk+1] && groups[fpk+1].length >= 3) {
-          validPlays.push({type:"plate",rank:fpk+1,count:6,indices:groups[fpk].slice(0,3).concat(groups[fpk+1].slice(0,3))});
-        }
-      }
-    }
-
-    // Bombs can always be played
-    if (tType !== "tianwang") {
-      for (var fb = 0; fb < gKeys.length; fb++) if (groups[gKeys[fb]].length >= 4)
-        for (var fbc = 4; fbc <= groups[gKeys[fb]].length; fbc++) {
-          var bombPlay = {type:"bomb",rank:gKeys[fb]+fbc*0.01,count:fbc,indices:groups[gKeys[fb]].slice(0,fbc)};
-          if (canBeat(bombPlay, trick)) validPlays.push(bombPlay);
-        }
-      var fjokers = [];
-      for (var fjk = 0; fjk < hand.length; fjk++) { if (hand[fjk].rank === "RJ" || hand[fjk].rank === "BJ") fjokers.push(fjk); }
-      if (fjokers.length === 4) validPlays.push({type:"tianwang",rank:200,count:4,indices:fjokers});
+    var allPossible = findAllPlays(hand, null);
+    for (var i = 0; i < allPossible.length; i++) {
+        if (canBeat(allPossible[i], trick)) validPlays.push(allPossible[i]);
     }
     return validPlays;
   }
 
-  // ==================== SMART AI ====================
+  // ==================== AI ENGINE (OPTIMIZED) ====================
+
+  // --- 1. 手数评估 (Hands Count Heuristic) ---
+  function getHandsCount(hand) {
+    if (hand.length === 0) return 0;
+    var tempHand = hand.slice();
+    var count = 0;
+    // 简单贪心评估：组合越大，手数越少
+    var groups = {};
+    tempHand.forEach(c => { var v = cardValue(c); groups[v] = (groups[v] || 0) + 1; });
+    
+    var vals = Object.values(groups);
+    vals.forEach(v => {
+        if (v >= 4) count += 1; // 炸弹算一手
+        else if (v === 3) count += 1; // 三张算一手
+        else if (v === 2) count += 1; // 对子算一手
+        else count += 1; // 单张算一手
+    });
+    // 粗略减去可能的组合（实际更复杂，这里做简化模拟）
+    return count;
+  }
+
+  function evaluateRole(seat) {
+    var myHandLen = gameState.hands[seat].length;
+    var partnerSeat = (seat + 2) % 4;
+    var partnerHandLen = gameState.hands[partnerSeat].length;
+    
+    if (partnerHandLen > 0 && partnerHandLen < myHandLen - 5) return "SUPPORTER"; // 队友牌明显更少，我当辅助
+    if (myHandLen < 10) return "CLOSER"; // 我快打完了，我是主攻
+    return "BALANCED";
+  }
+
+  function estimateWinChance(playRank, hand) {
+    // 简单评估这张牌大不大的概率
+    if (playRank >= 100) return 1.0; // 大王
+    if (playRank >= 99) return 0.9;  // 小王
+    if (playRank >= 15) return 0.8;  // 级牌
+    if (playRank >= 14) return 0.7;  // A
+    return (playRank - 2) / 13;
+  }
+
+  function scoreLeadPlay(play, hand, seat) {
+    var score = 0;
+    var hBefore = getHandsCount(hand);
+    var hAfter = getHandsCount(hand.filter((_, i) => play.indices.indexOf(i) === -1));
+    var role = evaluateRole(seat);
+
+    // 基础分：牌型长度。长牌（顺子、钢板）在早期非常有优势
+    var typeWeight = {
+      "plate": 150, "triple_pair_seq": 140, "straight": 120,
+      "triple_pair": 100, "triple": 40, "pair": 30, "single": 10,
+      "bomb": -50, "tianwang": -100 // 除非必要，不主动出炸弹
+    };
+    score += (typeWeight[play.type] || 0);
+
+    // 关键：手数缩减奖励
+    if (hBefore > hAfter) score += 100;
+
+    // 辅助模式：如果队友快跑了，多打单张/对子尝试喂牌
+    if (role === "SUPPORTER") {
+      if (play.type === "single" || play.type === "pair") score += 80;
+      if (play.rank > 14) score -= 50; // 辅助不轻易浪费大牌领出权
+    }
+
+    // 早期尽量出小牌
+    if (hand.length > 15) {
+      score += (14 - play.rank) * 5;
+    } else {
+      // 残局：优先出必胜牌拿回控制权
+      score += estimateWinChance(play.rank, hand) * 100;
+    }
+
+    return score;
+  }
+
+  function scoreFollowPlay(play, hand, trick, seat) {
+    var score = 0;
+    var partner = (seat + 2) % 4;
+    var isPartnerLeading = (gameState.lastPlayedBy === partner);
+    
+    // 核心：如果是队友在领跑，除非能最后冲刺，否则绝不压队友
+    if (isPartnerLeading) {
+      if (hand.length - play.count === 0) return 10000; // 接了就能打完
+      if (trick.rank >= 14) return -5000; // 队友出了大牌，我没必要压
+      return -1000; 
+    }
+
+    // 炸弹使用逻辑
+    if (play.type === "bomb" || play.type === "tianwang") {
+      var opps = (seat % 2 === 0) ? [1, 3] : [0, 2];
+      var oppClose = false;
+      opps.forEach(o => { if (gameState.hands[o].length > 0 && gameState.hands[o].length < 7) oppClose = true; });
+      
+      if (oppClose) score += 500; // 敌人快跑了，必须炸
+      else if (trick.rank > 14) score += 100; // 拦截大牌
+      else score -= 500; // 平时省着点
+    }
+
+    // 尽量用恰好大的牌去压
+    score += (20 - (play.rank - trick.rank)) * 10;
+    
+    return score;
+  }
+
   function aiPlay(seat) {
     var hand = gameState.hands[seat];
-    var n = hand.length;
-    if (n === 0) return null;
     var trick = gameState.currentTrick;
-    var partnerSeat = (seat + 2) % 4;
-    var opponents = (seat % 2 === 0) ? [1, 3] : [0, 2];
-    var partnerWinning = (gameState.lastPlayedBy === partnerSeat);
-    var oppClose = false;
-    var oppVeryClose = false;
-    for (var oi = 0; oi < opponents.length; oi++) {
-      var oLen = gameState.hands[opponents[oi]].length;
-      if (oLen <= 5 && gameState.finishOrder.indexOf(opponents[oi]) === -1) oppClose = true;
-      if (oLen <= 2 && gameState.finishOrder.indexOf(opponents[oi]) === -1) oppVeryClose = true;
-    }
-
-    var groups = {};
-    for (var gi = 0; gi < hand.length; gi++) {
-      var gv = cardValue(hand[gi]);
-      if (!groups[gv]) groups[gv] = [];
-      groups[gv].push(gi);
-    }
-    var gKeys = Object.keys(groups).map(Number).sort(function(a,b){return a-b;});
-
-    // FREE LEAD
-    if (!trick) {
-      var allPlays = findAllPlays(hand, null);
-      if (allPlays.length === 0) return null;
-      var candidates = [];
-      for (var ci = 0; ci < allPlays.length; ci++) {
-        var pt = allPlays[ci].type;
-        if (pt !== "bomb" && pt !== "tianwang" && pt !== "flush_straight") candidates.push(allPlays[ci]);
-      }
-      if (candidates.length === 0) candidates = allPlays;
-
-      // Can finish in one play?
-      for (var fi = 0; fi < candidates.length; fi++) {
-        if (candidates[fi].count === n) return candidates[fi];
-      }
-
-      // Prefer sequences
-      var seqPlays = [];
-      for (var sq = 0; sq < candidates.length; sq++) {
-        var st = candidates[sq].type;
-        if (st === "straight" || st === "triple_pair_seq" || st === "plate") seqPlays.push(candidates[sq]);
-      }
-      if (seqPlays.length > 0) { seqPlays.sort(function(a,b){return a.rank-b.rank;}); return seqPlays[0]; }
-
-      // Three+pair
-      var tpPlays = [];
-      for (var tp = 0; tp < candidates.length; tp++) { if (candidates[tp].type === "triple_pair") tpPlays.push(candidates[tp]); }
-      if (tpPlays.length > 0) { tpPlays.sort(function(a,b){return a.rank-b.rank;}); return tpPlays[0]; }
-
-      // Pairs if multiple
-      var pairKeys = [];
-      for (var pk = 0; pk < gKeys.length; pk++) { if (groups[gKeys[pk]].length === 2) pairKeys.push(gKeys[pk]); }
-      if (pairKeys.length >= 2) {
-        var pairPlays = [];
-        for (var pp = 0; pp < candidates.length; pp++) { if (candidates[pp].type === "pair") pairPlays.push(candidates[pp]); }
-        if (pairPlays.length > 0) { pairPlays.sort(function(a,b){return a.rank-b.rank;}); return pairPlays[0]; }
-      }
-
-      // Triples
-      var triPlays = [];
-      for (var tt = 0; tt < candidates.length; tt++) { if (candidates[tt].type === "triple") triPlays.push(candidates[tt]); }
-      if (triPlays.length > 0) { triPlays.sort(function(a,b){return a.rank-b.rank;}); return triPlays[0]; }
-
-      // Pairs
-      var pPlays = [];
-      for (var pp2 = 0; pp2 < candidates.length; pp2++) { if (candidates[pp2].type === "pair") pPlays.push(candidates[pp2]); }
-      if (pPlays.length > 0) { pPlays.sort(function(a,b){return a.rank-b.rank;}); return pPlays[0]; }
-
-      // True singletons
-      var trueSingles = [];
-      for (var ts = 0; ts < candidates.length; ts++) {
-        if (candidates[ts].type === "single" && groups[candidates[ts].rank] && groups[candidates[ts].rank].length === 1)
-          trueSingles.push(candidates[ts]);
-      }
-      if (trueSingles.length > 0) { trueSingles.sort(function(a,b){return a.rank-b.rank;}); return trueSingles[0]; }
-
-      candidates.sort(function(a,b){return a.rank-b.rank;});
-      return candidates[0];
-    }
-
-    // FOLLOWING
     var plays = findAllPlays(hand, trick);
     if (plays.length === 0) return null;
 
-    var normalPlays = [];
-    var bombPlays = [];
-    for (var ni = 0; ni < plays.length; ni++) {
-      var nt = plays[ni].type;
-      if (nt === "bomb" || nt === "tianwang" || nt === "flush_straight") bombPlays.push(plays[ni]);
-      else normalPlays.push(plays[ni]);
-    }
-    bombPlays.sort(function(a,b){return a.rank-b.rank;});
+    var ratedPlays = plays.map(p => {
+      return { play: p, score: trick ? scoreFollowPlay(p, hand, trick, seat) : scoreLeadPlay(p, hand, seat) };
+    });
 
-    // Partner winning
-    if (partnerWinning) {
-      for (var pw = 0; pw < plays.length; pw++) { if (plays[pw].count === n) return plays[pw]; }
-      return null;
-    }
+    ratedPlays.sort((a, b) => b.score - a.score);
+    var best = ratedPlays[0];
 
-    // Can finish?
-    for (var cf = 0; cf < plays.length; cf++) { if (plays[cf].count === n) return plays[cf]; }
+    // 如果是跟牌且最高分都很低（表示要浪费大牌或炸队友），则Pass
+    if (trick && best.score < -500) return null;
 
-    if (normalPlays.length > 0) {
-      normalPlays.sort(function(a,b){return a.rank-b.rank;});
-      if (oppVeryClose) return normalPlays[normalPlays.length - 1];
-      return normalPlays[0];
-    }
-
-    if (bombPlays.length > 0) {
-      if (oppClose || oppVeryClose || n <= 8) return bombPlays[0];
-      if (opponents.indexOf(gameState.lastPlayedBy) >= 0) {
-        if (trick.rank >= 12 || trick.count >= 5) return bombPlays[0];
-        if (Math.random() < 0.25) return bombPlays[0];
-      }
-    }
-    return null;
+    return best.play;
   }
 
   // ==================== GAME FLOW ====================
@@ -1082,8 +977,13 @@ color: #fff; gap: 10px;
       gameState.consecutivePasses = 0;
       gameState.lastPlayedBy = seat;
       gameState.isFirstPlay = false;
+      
+      for (var mi = 0; mi < cards.length; mi++) {
+        gameState.playedCards.push({ rank: cards[mi].rank, suit: cards[mi].suit, seat: seat });
+      }
       if (play.type === "bomb" || play.type === "tianwang" || play.type === "flush_straight") playSound("bomb");
       else playSound("play");
+      
       if (gameState.hands[seat].length === 0) {
         gameState.finishOrder.push(seat);
         if (checkRoundEnd()) return;
@@ -1119,13 +1019,12 @@ color: #fff; gap: 10px;
   function checkRoundEnd() {
     var fo = gameState.finishOrder;
     if (fo.length >= 2) {
-      var aFinished = 0;
-      var bFinished = 0;
+      var aFinished = 0, bFinished = 0;
       if (fo.indexOf(0) >= 0) aFinished++;
       if (fo.indexOf(2) >= 0) aFinished++;
       if (fo.indexOf(1) >= 0) bFinished++;
       if (fo.indexOf(3) >= 0) bFinished++;
-      if (aFinished === 2 || bFinished === 2 || fo.length >= 3) { endRound(); return true; }
+      if (aFinished === 2 || bFinished === 2) { endRound(); return true; }
     }
     if (fo.length >= 3) { endRound(); return true; }
     return false;
@@ -1133,32 +1032,20 @@ color: #fff; gap: 10px;
 
   function endRound() {
     gameState.roundActive = false;
-    for (var r = 0; r < 4; r++) {
-      if (gameState.finishOrder.indexOf(r) < 0) gameState.finishOrder.push(r);
-    }
+    for (var r = 0; r < 4; r++) { if (gameState.finishOrder.indexOf(r) < 0) gameState.finishOrder.push(r); }
     var fo = gameState.finishOrder;
-    var first = fo[0];
-    var winnerIsA = (first % 2 === 0);
-    var partnerPos = fo.indexOf((first + 2) % 4);
+    var winnerIsA = (fo[0] % 2 === 0);
+    var partnerPos = fo.indexOf((fo[0] + 2) % 4);
     var upgrade = (partnerPos === 1) ? 3 : (partnerPos === 2) ? 2 : 1;
-    if (winnerIsA) {
-      gameState.teamALevel = Math.min(14, gameState.teamALevel + upgrade);
-      gameState.level = gameState.teamALevel;
-    } else {
-      gameState.teamBLevel = Math.min(14, gameState.teamBLevel + upgrade);
-      gameState.level = gameState.teamBLevel;
-    }
+    if (winnerIsA) { gameState.teamALevel = Math.min(14, gameState.teamALevel + upgrade); gameState.level = gameState.teamALevel; }
+    else { gameState.teamBLevel = Math.min(14, gameState.teamBLevel + upgrade); gameState.level = gameState.teamBLevel; }
+    
     playSound(winnerIsA ? "win" : "pass");
-    var posNames = ["\u5934\u6e38", "\u4e8c\u6e38", "\u4e09\u6e38", "\u672b\u6e38"];
+    var posNames = ["头游", "二游", "三游", "末游"];
     var resultLines = "";
-    for (var i = 0; i < fo.length; i++) {
-      resultLines += posNames[i] + ": " + SEAT_NAMES[fo[i]];
-      if (i < fo.length - 1) resultLines += "<br>";
-    }
-    document.getElementById("resultTitle").textContent = winnerIsA ? "\ud83c\udf89 \u6211\u65b9\u83b7\u80dc\uff01" : "\ud83d\ude1e \u5bf9\u65b9\u83b7\u80dc";
-    document.getElementById("resultInfo").innerHTML = resultLines + "<br><br>" +
-      (winnerIsA ? "\u6211\u65b9" : "\u5bf9\u65b9") + "\u5347" + upgrade + "\u7ea7<br>" +
-      "\u6211\u65b9: " + levelName(gameState.teamALevel) + " | \u5bf9\u65b9: " + levelName(gameState.teamBLevel);
+    for (var i = 0; i < fo.length; i++) { resultLines += posNames[i] + ": " + SEAT_NAMES[fo[i]] + "<br>"; }
+    document.getElementById("resultTitle").textContent = winnerIsA ? "🎉 我方获胜！" : "😟 对方获胜";
+    document.getElementById("resultInfo").innerHTML = resultLines + "<br>" + (winnerIsA ? "我方" : "对方") + "升" + upgrade + "级";
     document.getElementById("overlay").classList.remove("hidden");
   }
 
@@ -1171,35 +1058,36 @@ color: #fff; gap: 10px;
   function doPlay() {
     if (gameState.currentPlayer !== 0 || !gameState.roundActive) return;
     var selected = [];
-    for (var i = 0; i < gameState.hands[0].length; i++) {
-      if (gameState.hands[0][i]._selected) selected.push(i);
-    }
+    for (var i = 0; i < gameState.hands[0].length; i++) { if (gameState.hands[0][i]._selected) selected.push(i); }
     if (selected.length === 0) return;
     var cards = [];
     for (var j = 0; j < selected.length; j++) cards.push(gameState.hands[0][selected[j]]);
     var playType = detectType(cards);
-    if (!playType) { showMsg("\u65e0\u6548\u724c\u578b\uff01"); return; }
-    if (gameState.currentTrick && !canBeat(playType, gameState.currentTrick)) { showMsg("\u6253\u4e0d\u8fc7\uff01"); return; }
+    if (!playType) { showMsg("无效牌型！"); return; }
+    if (gameState.currentTrick && !canBeat(playType, gameState.currentTrick)) { showMsg("打不过！"); return; }
     for (var k = 0; k < gameState.hands[0].length; k++) gameState.hands[0][k]._selected = false;
     executePlay(0, { type: playType.type, rank: playType.rank, count: playType.count, indices: selected });
   }
 
   function doPass() {
     if (gameState.currentPlayer !== 0 || !gameState.roundActive || gameState.isFirstPlay) return;
-    if (!gameState.currentTrick) { showMsg("\u5fc5\u987b\u51fa\u724c\uff01"); return; }
     for (var i = 0; i < gameState.hands[0].length; i++) gameState.hands[0][i]._selected = false;
     executePlay(0, null);
   }
 
   function doHint() {
     if (gameState.currentPlayer !== 0 || !gameState.roundActive) return;
-    var hand = gameState.hands[0];
-    var plays = findAllPlays(hand, gameState.currentTrick);
-    if (plays.length === 0) { showMsg("\u6ca1\u6709\u53ef\u51fa\u7684\u724c"); return; }
-    for (var i = 0; i < hand.length; i++) hand[i]._selected = false;
+    var plays = findAllPlays(gameState.hands[0], gameState.currentTrick);
+    if (plays.length === 0) { showMsg("没有可出的牌"); return; }
+    // 提示逻辑也用AI评分，给玩家提示“最好”的那手牌
+    plays.sort((a,b) => {
+        var sa = gameState.currentTrick ? scoreFollowPlay(a, gameState.hands[0], gameState.currentTrick, 0) : scoreLeadPlay(a, gameState.hands[0], 0);
+        var sb = gameState.currentTrick ? scoreFollowPlay(b, gameState.hands[0], gameState.currentTrick, 0) : scoreLeadPlay(b, gameState.hands[0], 0);
+        return sb - sa;
+    });
+    for (var i = 0; i < gameState.hands[0].length; i++) gameState.hands[0][i]._selected = false;
     hintIndex = hintIndex % plays.length;
-    var indices = plays[hintIndex].indices;
-    for (var j = 0; j < indices.length; j++) hand[indices[j]]._selected = true;
+    plays[hintIndex].indices.forEach(idx => gameState.hands[0][idx]._selected = true);
     hintIndex++;
     renderHand();
   }
@@ -1219,34 +1107,21 @@ color: #fff; gap: 10px;
 
   function startRound() {
     deal();
-    gameState.currentTrick = null;
-    gameState.currentPlayer = 0;
-    gameState.finishOrder = [];
-    gameState.roundActive = true;
-    gameState.lastPlays = [null, null, null, null];
-    gameState.consecutivePasses = 0;
-    gameState.lastPlayedBy = -1;
-    gameState.isFirstPlay = true;
-    hintIndex = 0;
+    gameState.currentTrick = null; gameState.currentPlayer = 0; gameState.finishOrder = []; gameState.roundActive = true;
+    gameState.lastPlays = [null, null, null, null]; gameState.consecutivePasses = 0; gameState.lastPlayedBy = -1;
+    gameState.isFirstPlay = true; gameState.playedCards = []; hintIndex = 0;
     document.getElementById("overlay").classList.add("hidden");
     updateUI();
-    if (gameState.currentPlayer !== 0) setTimeout(aiTurn, 700);
   }
 
-  function nextRound() { startRound(); }
-
-  // ==================== EVENT BINDINGS ====================
   document.getElementById("btnPlay").addEventListener("click", doPlay);
   document.getElementById("btnPass").addEventListener("click", doPass);
   document.getElementById("btnHint").addEventListener("click", doHint);
   document.getElementById("btnCheat").addEventListener("click", toggleCheat);
-  document.getElementById("btnNext").addEventListener("click", nextRound);
+  document.getElementById("btnNext").addEventListener("click", startRound);
 
-  // ==================== START ====================
   startRound();
-
 })();
 </script>
-
 </body>
-  </html>
+</html>
