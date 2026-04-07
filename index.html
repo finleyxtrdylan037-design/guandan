@@ -761,30 +761,61 @@ color: #fff; gap: 10px;
       }
     }
 
-    // Three consecutive pairs (6 cards, no wilds)
-    if (n === 6 && wc === 0) {
-      var pairVals = [];
-      for (var pv = 0; pv < allEntries.length; pv++) {
-        if (allEntries[pv][1] === 2) pairVals.push(allEntries[pv][0]);
-      }
-      if (pairVals.length === 3) {
-        pairVals.sort(function(a,b){return a-b;});
-        if (pairVals[2] - pairVals[0] === 2 && pairVals[2] <= 14) {
-          return { type: "triple_pair_seq", rank: pairVals[2], count: 6, cards: cards };
+    // Three consecutive pairs (6 cards) - with wild support
+    if (n === 6) {
+      // Try all possible starting values for 3 consecutive pairs
+      for (var cpStart = 2; cpStart <= 12; cpStart++) {
+        if (cpStart + 2 > 14) continue;
+        var cpWildsLeft = wc;
+        var cpOk = true;
+        for (var cpv = cpStart; cpv < cpStart + 3; cpv++) {
+          // Count non-wild cards of this value in the selected cards
+          var cpHave = 0;
+          for (var cpi = 0; cpi < normals.length; cpi++) {
+            if (normals[cpi].v === cpv) cpHave++;
+          }
+          var cpNeed = 2 - cpHave;
+          if (cpNeed < 0) cpNeed = 0;
+          if (cpNeed > cpWildsLeft) { cpOk = false; break; }
+          cpWildsLeft -= cpNeed;
+        }
+        // Also check all normals are accounted for (no extra normals outside the range)
+        if (cpOk && cpWildsLeft === 0) {
+          var cpExtraNormals = 0;
+          for (var cpn = 0; cpn < normals.length; cpn++) {
+            if (normals[cpn].v < cpStart || normals[cpn].v > cpStart + 2) cpExtraNormals++;
+          }
+          if (cpExtraNormals === 0) {
+            return { type: "triple_pair_seq", rank: cpStart + 2, count: 6, cards: cards };
+          }
         }
       }
     }
 
-    // Steel plate (6 cards, no wilds)
-    if (n === 6 && wc === 0) {
-      var tripleVals = [];
-      for (var tv = 0; tv < allEntries.length; tv++) {
-        if (allEntries[tv][1] === 3) tripleVals.push(allEntries[tv][0]);
-      }
-      if (tripleVals.length === 2) {
-        tripleVals.sort(function(a,b){return a-b;});
-        if (tripleVals[1] - tripleVals[0] === 1 && tripleVals[1] <= 14) {
-          return { type: "plate", rank: tripleVals[1], count: 6, cards: cards };
+    // Steel plate (6 cards) - with wild support
+    if (n === 6) {
+      for (var plStart = 2; plStart <= 13; plStart++) {
+        if (plStart + 1 > 14) continue;
+        var plWildsLeft = wc;
+        var plOk = true;
+        for (var plv = plStart; plv < plStart + 2; plv++) {
+          var plHave = 0;
+          for (var pli = 0; pli < normals.length; pli++) {
+            if (normals[pli].v === plv) plHave++;
+          }
+          var plNeed = 3 - plHave;
+          if (plNeed < 0) plNeed = 0;
+          if (plNeed > plWildsLeft) { plOk = false; break; }
+          plWildsLeft -= plNeed;
+        }
+        if (plOk && plWildsLeft === 0) {
+          var plExtraNormals = 0;
+          for (var pln = 0; pln < normals.length; pln++) {
+            if (normals[pln].v < plStart || normals[pln].v > plStart + 1) plExtraNormals++;
+          }
+          if (plExtraNormals === 0) {
+            return { type: "plate", rank: plStart + 1, count: 6, cards: cards };
+          }
         }
       }
     }
@@ -811,11 +842,22 @@ color: #fff; gap: 10px;
     return play.rank > trick.rank;
   }
 
-  // ==================== FIND ALL PLAYS ====================
+  // ==================== FIND ALL PLAYS (WITH WILD CARD SUPPORT) ====================
   function findAllPlays(hand, trick) {
     var plays = [];
     var n = hand.length;
     if (n === 0) return plays;
+
+    // Separate wild cards and normal cards
+    var wildIndices = [];
+    var normalIndices = [];
+    for (var w = 0; w < hand.length; w++) {
+      if (isWild(hand[w])) wildIndices.push(w);
+      else normalIndices.push(w);
+    }
+    var numWilds = wildIndices.length;
+
+    // Group normal cards by value
     var groups = {};
     for (var i = 0; i < hand.length; i++) {
       var v = cardValue(hand[i]);
@@ -824,119 +866,500 @@ color: #fff; gap: 10px;
     }
     var gKeys = Object.keys(groups).map(Number).sort(function(a,b){return a-b;});
 
+    // Group normal (non-wild) cards by value
+    var normGroups = {};
+    for (var ni = 0; ni < normalIndices.length; ni++) {
+      var nv = cardValue(hand[normalIndices[ni]]);
+      if (!normGroups[nv]) normGroups[nv] = [];
+      normGroups[nv].push(normalIndices[ni]);
+    }
+    var normKeys = Object.keys(normGroups).map(Number).sort(function(a,b){return a-b;});
+
+    // Wild card value (for grouping purposes)
+    var wildVal = numWilds > 0 ? cardValue(hand[wildIndices[0]]) : -1;
+
+    // Helper: pick indices for a value, using wilds if needed
+    // Returns array of indices or null if not enough
+    function pickCards(val, needed, usedWilds) {
+      var available = normGroups[val] ? normGroups[val].slice() : [];
+      // Don't double-use wilds already allocated
+      var result = [];
+      var wildsNeeded = 0;
+      for (var i = 0; i < available.length && result.length < needed; i++) {
+        // Skip if this index is a wild (wilds handled separately)
+        if (wildIndices.indexOf(available[i]) >= 0) continue;
+        result.push(available[i]);
+      }
+      wildsNeeded = needed - result.length;
+      if (wildsNeeded > numWilds - usedWilds) return null;
+      // Add wild indices
+      var wUsed = 0;
+      for (var wi = 0; wi < wildIndices.length && wUsed < wildsNeeded; wi++) {
+        // Check wild not already used in usedWilds count
+        result.push(wildIndices[wi + usedWilds]); // This is simplified; proper tracking below
+        wUsed++;
+      }
+      if (result.length < needed) return null;
+      return { indices: result, wildsUsed: wildsNeeded };
+    }
+
+    // Better helper: allocate specific wild indices
+    function allocateWilds(needed, excludeWilds) {
+      var result = [];
+      for (var wi = 0; wi < wildIndices.length && result.length < needed; wi++) {
+        if (excludeWilds.indexOf(wildIndices[wi]) < 0) {
+          result.push(wildIndices[wi]);
+        }
+      }
+      return result.length >= needed ? result : null;
+    }
+
+    // Get non-wild cards of a value
+    function getNonWild(val) {
+      var result = [];
+      if (!normGroups[val]) return result;
+      for (var i = 0; i < normGroups[val].length; i++) {
+        if (wildIndices.indexOf(normGroups[val][i]) < 0) result.push(normGroups[val][i]);
+      }
+      return result;
+    }
+
+    // Deduplicate plays by type+rank+count
+    function addPlay(list, play) {
+      list.push(play);
+    }
+
     if (!trick) {
-      // Singles
-      for (var s = 0; s < gKeys.length; s++) plays.push({type:"single",rank:gKeys[s],count:1,indices:[groups[gKeys[s]][0]]});
-      // Pairs
-      for (var p = 0; p < gKeys.length; p++) if (groups[gKeys[p]].length >= 2) plays.push({type:"pair",rank:gKeys[p],count:2,indices:groups[gKeys[p]].slice(0,2)});
-      // Triples
-      for (var t = 0; t < gKeys.length; t++) if (groups[gKeys[t]].length >= 3) plays.push({type:"triple",rank:gKeys[t],count:3,indices:groups[gKeys[t]].slice(0,3)});
-      // Bombs
-      for (var b = 0; b < gKeys.length; b++) if (groups[gKeys[b]].length >= 4)
-        for (var bc = 4; bc <= groups[gKeys[b]].length; bc++)
-          plays.push({type:"bomb",rank:gKeys[b]+bc*0.01,count:bc,indices:groups[gKeys[b]].slice(0,bc)});
-      // Three+pair
-      for (var tp1 = 0; tp1 < gKeys.length; tp1++) if (groups[gKeys[tp1]].length >= 3)
-        for (var tp2 = 0; tp2 < gKeys.length; tp2++) if (gKeys[tp2] !== gKeys[tp1] && groups[gKeys[tp2]].length >= 2) {
-          plays.push({type:"triple_pair",rank:gKeys[tp1],count:5,indices:groups[gKeys[tp1]].slice(0,3).concat(groups[gKeys[tp2]].slice(0,2))});
-        }
-      // Straights
-      for (var si = 0; si < gKeys.length; si++) {
-        if (gKeys[si] > 14) continue;
-        var seq = [gKeys[si]];
-        for (var sj = si + 1; sj < gKeys.length && seq.length < 5; sj++) {
-          if (gKeys[sj] > 14) continue;
-          if (gKeys[sj] === seq[seq.length-1]+1) seq.push(gKeys[sj]);
-          else if (gKeys[sj] > seq[seq.length-1]+1) break;
-        }
-        if (seq.length === 5 && seq[4] <= 14) {
-          var idx = [];
-          for (var sq = 0; sq < seq.length; sq++) idx.push(groups[seq[sq]][0]);
-          plays.push({type:"straight",rank:seq[4],count:5,indices:idx});
+      // ===== FREE LEAD =====
+
+      // Singles (including wilds as their face value)
+      for (var s = 0; s < gKeys.length; s++) {
+        addPlay(plays, {type:"single",rank:gKeys[s],count:1,indices:[groups[gKeys[s]][0]]});
+      }
+
+      // Pairs: normal pairs + wild-assisted pairs
+      for (var p = 0; p < gKeys.length; p++) {
+        if (groups[gKeys[p]].length >= 2) {
+          addPlay(plays, {type:"pair",rank:gKeys[p],count:2,indices:groups[gKeys[p]].slice(0,2)});
         }
       }
-      // Three consecutive pairs
-      for (var cp1 = 0; cp1 < gKeys.length; cp1++) {
-        var k1 = gKeys[cp1]; if (k1 > 14) continue;
-        if (groups[k1] && groups[k1].length >= 2 && groups[k1+1] && groups[k1+1].length >= 2 && groups[k1+2] && groups[k1+2].length >= 2 && k1+2 <= 14) {
-          plays.push({type:"triple_pair_seq",rank:k1+2,count:6,indices:groups[k1].slice(0,2).concat(groups[k1+1].slice(0,2)).concat(groups[k1+2].slice(0,2))});
+      // Wild + any single card = pair
+      if (numWilds >= 1) {
+        for (var wp = 0; wp < normKeys.length; wp++) {
+          var wpv = normKeys[wp];
+          if (wpv === wildVal) continue; // already counted above
+          var wpCards = getNonWild(wpv);
+          if (wpCards.length >= 1) {
+            addPlay(plays, {type:"pair",rank:wpv,count:2,indices:[wpCards[0], wildIndices[0]]});
+          }
         }
       }
-      // Plate
-      for (var pl1 = 0; pl1 < gKeys.length; pl1++) {
-        var pk = gKeys[pl1]; if (pk > 14) continue;
-        if (groups[pk] && groups[pk].length >= 3 && groups[pk+1] && groups[pk+1].length >= 3 && pk+1 <= 14) {
-          plays.push({type:"plate",rank:pk+1,count:6,indices:groups[pk].slice(0,3).concat(groups[pk+1].slice(0,3))});
+
+      // Triples: normal + wild-assisted
+      for (var t = 0; t < gKeys.length; t++) {
+        if (groups[gKeys[t]].length >= 3) {
+          addPlay(plays, {type:"triple",rank:gKeys[t],count:3,indices:groups[gKeys[t]].slice(0,3)});
         }
       }
+      // 2 normals + 1 wild = triple
+      if (numWilds >= 1) {
+        for (var wt = 0; wt < normKeys.length; wt++) {
+          var wtv = normKeys[wt];
+          var wtCards = getNonWild(wtv);
+          if (wtCards.length >= 2 && wtv !== wildVal) {
+            addPlay(plays, {type:"triple",rank:wtv,count:3,indices:[wtCards[0], wtCards[1], wildIndices[0]]});
+          }
+        }
+      }
+      // 1 normal + 2 wilds = triple
+      if (numWilds >= 2) {
+        for (var wt2 = 0; wt2 < normKeys.length; wt2++) {
+          var wt2v = normKeys[wt2];
+          var wt2Cards = getNonWild(wt2v);
+          if (wt2Cards.length >= 1 && wt2v !== wildVal) {
+            addPlay(plays, {type:"triple",rank:wt2v,count:3,indices:[wt2Cards[0], wildIndices[0], wildIndices[1]]});
+          }
+        }
+      }
+
+      // Bombs (only pure, no wilds - wilds in bombs handled by groups already)
+      for (var b = 0; b < gKeys.length; b++) {
+        if (groups[gKeys[b]].length >= 4) {
+          for (var bc = 4; bc <= groups[gKeys[b]].length; bc++) {
+            addPlay(plays, {type:"bomb",rank:gKeys[b]+bc*0.01,count:bc,indices:groups[gKeys[b]].slice(0,bc)});
+          }
+        }
+      }
+
+      // Three+pair (including wild-assisted)
+      // For each possible triple (with/without wilds), find a pair (with/without wilds)
+      var allTriples = []; // {rank, indices, wildsUsed:[indices]}
+      for (var tp1 = 0; tp1 < gKeys.length; tp1++) {
+        if (groups[gKeys[tp1]].length >= 3) {
+          allTriples.push({rank:gKeys[tp1], indices:groups[gKeys[tp1]].slice(0,3), wIdx:[]});
+        }
+      }
+      if (numWilds >= 1) {
+        for (var tp1w = 0; tp1w < normKeys.length; tp1w++) {
+          var tpv = normKeys[tp1w];
+          var tpC = getNonWild(tpv);
+          if (tpC.length >= 2 && tpv !== wildVal) {
+            allTriples.push({rank:tpv, indices:[tpC[0],tpC[1],wildIndices[0]], wIdx:[wildIndices[0]]});
+          }
+        }
+      }
+      for (var at = 0; at < allTriples.length; at++) {
+        var tri = allTriples[at];
+        // Find pairs not overlapping with triple indices
+        for (var tp2 = 0; tp2 < gKeys.length; tp2++) {
+          if (gKeys[tp2] === tri.rank) continue;
+          var pairCands = [];
+          for (var pc = 0; pc < groups[gKeys[tp2]].length; pc++) {
+            if (tri.indices.indexOf(groups[gKeys[tp2]][pc]) < 0) pairCands.push(groups[gKeys[tp2]][pc]);
+          }
+          if (pairCands.length >= 2) {
+            addPlay(plays, {type:"triple_pair",rank:tri.rank,count:5,indices:tri.indices.concat(pairCands.slice(0,2))});
+          }
+        }
+        // Wild-assisted pair: 1 normal + 1 unused wild
+        if (numWilds > tri.wIdx.length) {
+          var unusedWild = null;
+          for (var uw = 0; uw < wildIndices.length; uw++) {
+            if (tri.wIdx.indexOf(wildIndices[uw]) < 0 && tri.indices.indexOf(wildIndices[uw]) < 0) {
+              unusedWild = wildIndices[uw]; break;
+            }
+          }
+          if (unusedWild !== null) {
+            for (var tp3 = 0; tp3 < normKeys.length; tp3++) {
+              var tp3v = normKeys[tp3];
+              if (tp3v === tri.rank) continue;
+              var tp3C = getNonWild(tp3v);
+              var tp3avail = [];
+              for (var tp3i = 0; tp3i < tp3C.length; tp3i++) {
+                if (tri.indices.indexOf(tp3C[tp3i]) < 0) tp3avail.push(tp3C[tp3i]);
+              }
+              if (tp3avail.length >= 1) {
+                addPlay(plays, {type:"triple_pair",rank:tri.rank,count:5,indices:tri.indices.concat([tp3avail[0], unusedWild])});
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      // Straights (5 consecutive, values 2-14) WITH wild substitution
+      for (var start = 2; start <= 10; start++) {
+        var seqIdx = [];
+        var wildsUsedForSeq = 0;
+        var wildIdxUsed = [];
+        var valid = true;
+        for (var sv = start; sv < start + 5; sv++) {
+          var svCards = getNonWild(sv);
+          if (svCards.length >= 1) {
+            seqIdx.push(svCards[0]);
+          } else if (wildsUsedForSeq < numWilds) {
+            // Use a wild
+            var wIdx = null;
+            for (var swi = 0; swi < wildIndices.length; swi++) {
+              if (wildIdxUsed.indexOf(wildIndices[swi]) < 0 && seqIdx.indexOf(wildIndices[swi]) < 0) {
+                wIdx = wildIndices[swi]; break;
+              }
+            }
+            if (wIdx !== null) {
+              seqIdx.push(wIdx);
+              wildIdxUsed.push(wIdx);
+              wildsUsedForSeq++;
+            } else {
+              valid = false; break;
+            }
+          } else {
+            valid = false; break;
+          }
+        }
+        if (valid && seqIdx.length === 5) {
+          addPlay(plays, {type:"straight",rank:start+4,count:5,indices:seqIdx});
+        }
+      }
+
+      // Three consecutive pairs WITH wild substitution
+      for (var cpStart = 2; cpStart <= 12; cpStart++) {
+        if (cpStart + 2 > 14) continue;
+        var cpIdx = [];
+        var cpWildsUsed = [];
+        var cpValid = true;
+        for (var cpv = cpStart; cpv < cpStart + 3; cpv++) {
+          var cpCards = getNonWild(cpv);
+          var cpAvail = [];
+          for (var cpi = 0; cpi < cpCards.length; cpi++) {
+            if (cpIdx.indexOf(cpCards[cpi]) < 0) cpAvail.push(cpCards[cpi]);
+          }
+          var cpNeed = 2 - cpAvail.length;
+          if (cpNeed > 0) {
+            // Use wilds
+            var cpWilds = [];
+            for (var cwi = 0; cwi < wildIndices.length; cwi++) {
+              if (cpWildsUsed.indexOf(wildIndices[cwi]) < 0 && cpIdx.indexOf(wildIndices[cwi]) < 0) {
+                cpWilds.push(wildIndices[cwi]);
+                if (cpWilds.length >= cpNeed) break;
+              }
+            }
+            if (cpWilds.length < cpNeed) { cpValid = false; break; }
+            for (var cwj = 0; cwj < cpNeed; cwj++) cpWildsUsed.push(cpWilds[cwj]);
+            cpIdx = cpIdx.concat(cpAvail.slice(0, 2 - cpNeed)).concat(cpWilds.slice(0, cpNeed));
+          } else {
+            cpIdx = cpIdx.concat(cpAvail.slice(0, 2));
+          }
+        }
+        if (cpValid && cpIdx.length === 6) {
+          addPlay(plays, {type:"triple_pair_seq",rank:cpStart+2,count:6,indices:cpIdx});
+        }
+      }
+
+      // Plate (2 consecutive triples) WITH wild substitution
+      for (var plStart = 2; plStart <= 13; plStart++) {
+        if (plStart + 1 > 14) continue;
+        var plIdx = [];
+        var plWildsUsed = [];
+        var plValid = true;
+        for (var plv = plStart; plv < plStart + 2; plv++) {
+          var plCards = getNonWild(plv);
+          var plAvail = [];
+          for (var pli = 0; pli < plCards.length; pli++) {
+            if (plIdx.indexOf(plCards[pli]) < 0) plAvail.push(plCards[pli]);
+          }
+          var plNeed = 3 - plAvail.length;
+          if (plNeed > 0) {
+            var plWilds = [];
+            for (var pwi = 0; pwi < wildIndices.length; pwi++) {
+              if (plWildsUsed.indexOf(wildIndices[pwi]) < 0 && plIdx.indexOf(wildIndices[pwi]) < 0) {
+                plWilds.push(wildIndices[pwi]);
+                if (plWilds.length >= plNeed) break;
+              }
+            }
+            if (plWilds.length < plNeed) { plValid = false; break; }
+            for (var pwj = 0; pwj < plNeed; pwj++) plWildsUsed.push(plWilds[pwj]);
+            plIdx = plIdx.concat(plAvail.slice(0, 3 - plNeed)).concat(plWilds.slice(0, plNeed));
+          } else {
+            plIdx = plIdx.concat(plAvail.slice(0, 3));
+          }
+        }
+        if (plValid && plIdx.length === 6) {
+          addPlay(plays, {type:"plate",rank:plStart+1,count:6,indices:plIdx});
+        }
+      }
+
       // Tianwang
       var jokers = [];
-      for (var jk = 0; jk < hand.length; jk++) { if (hand[jk].rank === "RJ" || hand[jk].rank === "BJ") jokers.push(jk); }
-      if (jokers.length === 4) plays.push({type:"tianwang",rank:200,count:4,indices:jokers});
+      for (var jk = 0; jk < hand.length; jk++) {
+        if (hand[jk].rank === "RJ" || hand[jk].rank === "BJ") jokers.push(jk);
+      }
+      if (jokers.length === 4) addPlay(plays, {type:"tianwang",rank:200,count:4,indices:jokers});
+
       return plays;
     }
 
-    // Following a trick
+    // ===== FOLLOWING A TRICK =====
     var validPlays = [];
     var tType = trick.type;
     var tRank = trick.rank;
 
     if (tType === "single") {
-      for (var fs = 0; fs < gKeys.length; fs++) if (gKeys[fs] > tRank) validPlays.push({type:"single",rank:gKeys[fs],count:1,indices:[groups[gKeys[fs]][0]]});
+      for (var fs = 0; fs < gKeys.length; fs++) {
+        if (gKeys[fs] > tRank) validPlays.push({type:"single",rank:gKeys[fs],count:1,indices:[groups[gKeys[fs]][0]]});
+      }
     } else if (tType === "pair") {
-      for (var fp = 0; fp < gKeys.length; fp++) if (groups[gKeys[fp]].length >= 2 && gKeys[fp] > tRank) validPlays.push({type:"pair",rank:gKeys[fp],count:2,indices:groups[gKeys[fp]].slice(0,2)});
+      // Normal pairs
+      for (var fp = 0; fp < gKeys.length; fp++) {
+        if (groups[gKeys[fp]].length >= 2 && gKeys[fp] > tRank) {
+          validPlays.push({type:"pair",rank:gKeys[fp],count:2,indices:groups[gKeys[fp]].slice(0,2)});
+        }
+      }
+      // Wild-assisted pairs
+      if (numWilds >= 1) {
+        for (var fwp = 0; fwp < normKeys.length; fwp++) {
+          var fwpv = normKeys[fwp];
+          if (fwpv <= tRank || fwpv === wildVal) continue;
+          var fwpC = getNonWild(fwpv);
+          if (fwpC.length >= 1) {
+            validPlays.push({type:"pair",rank:fwpv,count:2,indices:[fwpC[0], wildIndices[0]]});
+          }
+        }
+      }
     } else if (tType === "triple") {
-      for (var ft = 0; ft < gKeys.length; ft++) if (groups[gKeys[ft]].length >= 3 && gKeys[ft] > tRank) validPlays.push({type:"triple",rank:gKeys[ft],count:3,indices:groups[gKeys[ft]].slice(0,3)});
+      for (var ft = 0; ft < gKeys.length; ft++) {
+        if (groups[gKeys[ft]].length >= 3 && gKeys[ft] > tRank) {
+          validPlays.push({type:"triple",rank:gKeys[ft],count:3,indices:groups[gKeys[ft]].slice(0,3)});
+        }
+      }
+      // Wild-assisted triples
+      if (numWilds >= 1) {
+        for (var fwt = 0; fwt < normKeys.length; fwt++) {
+          var fwtv = normKeys[fwt];
+          if (fwtv <= tRank || fwtv === wildVal) continue;
+          var fwtC = getNonWild(fwtv);
+          if (fwtC.length >= 2) {
+            validPlays.push({type:"triple",rank:fwtv,count:3,indices:[fwtC[0],fwtC[1],wildIndices[0]]});
+          }
+        }
+      }
+      if (numWilds >= 2) {
+        for (var fwt2 = 0; fwt2 < normKeys.length; fwt2++) {
+          var fwt2v = normKeys[fwt2];
+          if (fwt2v <= tRank || fwt2v === wildVal) continue;
+          var fwt2C = getNonWild(fwt2v);
+          if (fwt2C.length >= 1) {
+            validPlays.push({type:"triple",rank:fwt2v,count:3,indices:[fwt2C[0],wildIndices[0],wildIndices[1]]});
+          }
+        }
+      }
     } else if (tType === "triple_pair") {
-      for (var ftp = 0; ftp < gKeys.length; ftp++) if (groups[gKeys[ftp]].length >= 3 && gKeys[ftp] > tRank)
-        for (var ftp2 = 0; ftp2 < gKeys.length; ftp2++) if (gKeys[ftp2] !== gKeys[ftp] && groups[gKeys[ftp2]].length >= 2) {
-          validPlays.push({type:"triple_pair",rank:gKeys[ftp],count:5,indices:groups[gKeys[ftp]].slice(0,3).concat(groups[gKeys[ftp2]].slice(0,2))});
-          break;
+      // Use same logic as free lead but filter by rank > tRank
+      var tpLeadPlays = [];
+      // Generate all possible triple_pair from free lead logic
+      var tpAll = allTriples || [];
+      // Rebuild triples list for following
+      var fTriples = [];
+      for (var ftp0 = 0; ftp0 < gKeys.length; ftp0++) {
+        if (groups[gKeys[ftp0]].length >= 3 && gKeys[ftp0] > tRank) {
+          fTriples.push({rank:gKeys[ftp0], indices:groups[gKeys[ftp0]].slice(0,3), wIdx:[]});
         }
+      }
+      if (numWilds >= 1) {
+        for (var ftp1 = 0; ftp1 < normKeys.length; ftp1++) {
+          var ftpv = normKeys[ftp1];
+          if (ftpv <= tRank || ftpv === wildVal) continue;
+          var ftpC = getNonWild(ftpv);
+          if (ftpC.length >= 2) {
+            fTriples.push({rank:ftpv, indices:[ftpC[0],ftpC[1],wildIndices[0]], wIdx:[wildIndices[0]]});
+          }
+        }
+      }
+      for (var fat = 0; fat < fTriples.length; fat++) {
+        var ftri = fTriples[fat];
+        for (var ftp2 = 0; ftp2 < gKeys.length; ftp2++) {
+          if (gKeys[ftp2] === ftri.rank) continue;
+          var fpCands = [];
+          for (var fpc = 0; fpc < groups[gKeys[ftp2]].length; fpc++) {
+            if (ftri.indices.indexOf(groups[gKeys[ftp2]][fpc]) < 0) fpCands.push(groups[gKeys[ftp2]][fpc]);
+          }
+          if (fpCands.length >= 2) {
+            validPlays.push({type:"triple_pair",rank:ftri.rank,count:5,indices:ftri.indices.concat(fpCands.slice(0,2))});
+            break;
+          }
+        }
+      }
     } else if (tType === "straight") {
-      for (var fsi = 0; fsi < gKeys.length; fsi++) {
-        if (gKeys[fsi] > 14) continue;
-        var fseq = [gKeys[fsi]];
-        for (var fsj = fsi+1; fsj < gKeys.length && fseq.length < 5; fsj++) {
-          if (gKeys[fsj] > 14) continue;
-          if (gKeys[fsj] === fseq[fseq.length-1]+1) fseq.push(gKeys[fsj]);
-          else if (gKeys[fsj] > fseq[fseq.length-1]+1) break;
+      // Straights with wild substitution
+      for (var fss = 2; fss <= 10; fss++) {
+        if (fss + 4 <= tRank) continue;
+        if (fss + 4 > 14) continue;
+        var fsIdx = [];
+        var fsWUsed = [];
+        var fsOk = true;
+        for (var fsv = fss; fsv < fss + 5; fsv++) {
+          var fsC = getNonWild(fsv);
+          var fsA = [];
+          for (var fsa = 0; fsa < fsC.length; fsa++) {
+            if (fsIdx.indexOf(fsC[fsa]) < 0) fsA.push(fsC[fsa]);
+          }
+          if (fsA.length >= 1) {
+            fsIdx.push(fsA[0]);
+          } else {
+            var fwi = null;
+            for (var fswi = 0; fswi < wildIndices.length; fswi++) {
+              if (fsWUsed.indexOf(wildIndices[fswi]) < 0 && fsIdx.indexOf(wildIndices[fswi]) < 0) {
+                fwi = wildIndices[fswi]; break;
+              }
+            }
+            if (fwi !== null) { fsIdx.push(fwi); fsWUsed.push(fwi); }
+            else { fsOk = false; break; }
+          }
         }
-        if (fseq.length === 5 && fseq[4] <= 14 && fseq[4] > tRank) {
-          var fidx = [];
-          for (var fsq = 0; fsq < fseq.length; fsq++) fidx.push(groups[fseq[fsq]][0]);
-          validPlays.push({type:"straight",rank:fseq[4],count:5,indices:fidx});
+        if (fsOk && fsIdx.length === 5 && fss + 4 > tRank) {
+          validPlays.push({type:"straight",rank:fss+4,count:5,indices:fsIdx});
         }
       }
     } else if (tType === "triple_pair_seq") {
-      for (var fcp = 0; fcp < gKeys.length; fcp++) {
-        var fk = gKeys[fcp]; if (fk > 14) continue;
-        if (fk+2 <= 14 && fk+2 > tRank && groups[fk] && groups[fk].length >= 2 && groups[fk+1] && groups[fk+1].length >= 2 && groups[fk+2] && groups[fk+2].length >= 2) {
-          validPlays.push({type:"triple_pair_seq",rank:fk+2,count:6,indices:groups[fk].slice(0,2).concat(groups[fk+1].slice(0,2)).concat(groups[fk+2].slice(0,2))});
+      for (var fcpS = 2; fcpS <= 12; fcpS++) {
+        if (fcpS + 2 > 14 || fcpS + 2 <= tRank) continue;
+        var fcpI = [], fcpW = [], fcpOk = true;
+        for (var fcpv = fcpS; fcpv < fcpS + 3; fcpv++) {
+          var fcpC = getNonWild(fcpv);
+          var fcpA = [];
+          for (var fcpa = 0; fcpa < fcpC.length; fcpa++) {
+            if (fcpI.indexOf(fcpC[fcpa]) < 0) fcpA.push(fcpC[fcpa]);
+          }
+          var fcpNeed = 2 - Math.min(fcpA.length, 2);
+          if (fcpNeed > 0) {
+            var fcpWi = [];
+            for (var fcwi = 0; fcwi < wildIndices.length; fcwi++) {
+              if (fcpW.indexOf(wildIndices[fcwi]) < 0 && fcpI.indexOf(wildIndices[fcwi]) < 0) {
+                fcpWi.push(wildIndices[fcwi]);
+                if (fcpWi.length >= fcpNeed) break;
+              }
+            }
+            if (fcpWi.length < fcpNeed) { fcpOk = false; break; }
+            for (var fcwj = 0; fcwj < fcpNeed; fcwj++) fcpW.push(fcpWi[fcwj]);
+            fcpI = fcpI.concat(fcpA.slice(0, 2 - fcpNeed)).concat(fcpWi.slice(0, fcpNeed));
+          } else {
+            fcpI = fcpI.concat(fcpA.slice(0, 2));
+          }
+        }
+        if (fcpOk && fcpI.length === 6) {
+          validPlays.push({type:"triple_pair_seq",rank:fcpS+2,count:6,indices:fcpI});
         }
       }
     } else if (tType === "plate") {
-      for (var fpl = 0; fpl < gKeys.length; fpl++) {
-        var fpk = gKeys[fpl]; if (fpk > 14) continue;
-        if (fpk+1 <= 14 && fpk+1 > tRank && groups[fpk] && groups[fpk].length >= 3 && groups[fpk+1] && groups[fpk+1].length >= 3) {
-          validPlays.push({type:"plate",rank:fpk+1,count:6,indices:groups[fpk].slice(0,3).concat(groups[fpk+1].slice(0,3))});
+      for (var fplS = 2; fplS <= 13; fplS++) {
+        if (fplS + 1 > 14 || fplS + 1 <= tRank) continue;
+        var fplI = [], fplW = [], fplOk = true;
+        for (var fplv = fplS; fplv < fplS + 2; fplv++) {
+          var fplC = getNonWild(fplv);
+          var fplA = [];
+          for (var fpla = 0; fpla < fplC.length; fpla++) {
+            if (fplI.indexOf(fplC[fpla]) < 0) fplA.push(fplC[fpla]);
+          }
+          var fplNeed = 3 - Math.min(fplA.length, 3);
+          if (fplNeed > 0) {
+            var fplWi = [];
+            for (var fpwi = 0; fpwi < wildIndices.length; fpwi++) {
+              if (fplW.indexOf(wildIndices[fpwi]) < 0 && fplI.indexOf(wildIndices[fpwi]) < 0) {
+                fplWi.push(wildIndices[fpwi]);
+                if (fplWi.length >= fplNeed) break;
+              }
+            }
+            if (fplWi.length < fplNeed) { fplOk = false; break; }
+            for (var fpwj = 0; fpwj < fplNeed; fpwj++) fplW.push(fplWi[fpwj]);
+            fplI = fplI.concat(fplA.slice(0, 3 - fplNeed)).concat(fplWi.slice(0, fplNeed));
+          } else {
+            fplI = fplI.concat(fplA.slice(0, 3));
+          }
+        }
+        if (fplOk && fplI.length === 6) {
+          validPlays.push({type:"plate",rank:fplS+1,count:6,indices:fplI});
         }
       }
     }
 
-    // Bombs can always be played
+    // Bombs can always be played (no wild substitution for bombs in following)
     if (tType !== "tianwang") {
-      for (var fb = 0; fb < gKeys.length; fb++) if (groups[gKeys[fb]].length >= 4)
-        for (var fbc = 4; fbc <= groups[gKeys[fb]].length; fbc++) {
-          var bombPlay = {type:"bomb",rank:gKeys[fb]+fbc*0.01,count:fbc,indices:groups[gKeys[fb]].slice(0,fbc)};
-          if (canBeat(bombPlay, trick)) validPlays.push(bombPlay);
+      for (var fb = 0; fb < gKeys.length; fb++) {
+        if (groups[gKeys[fb]].length >= 4) {
+          for (var fbc = 4; fbc <= groups[gKeys[fb]].length; fbc++) {
+            var bombPlay = {type:"bomb",rank:gKeys[fb]+fbc*0.01,count:fbc,indices:groups[gKeys[fb]].slice(0,fbc)};
+            if (canBeat(bombPlay, trick)) validPlays.push(bombPlay);
+          }
         }
+      }
       var fjokers = [];
-      for (var fjk = 0; fjk < hand.length; fjk++) { if (hand[fjk].rank === "RJ" || hand[fjk].rank === "BJ") fjokers.push(fjk); }
+      for (var fjk = 0; fjk < hand.length; fjk++) {
+        if (hand[fjk].rank === "RJ" || hand[fjk].rank === "BJ") fjokers.push(fjk);
+      }
       if (fjokers.length === 4) validPlays.push({type:"tianwang",rank:200,count:4,indices:fjokers});
     }
     return validPlays;
   }
+
 
   // ==================== AI ENGINE ====================
 
