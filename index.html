@@ -427,7 +427,7 @@ color: #fff; gap: 10px;
   }
 
   function levelName(lv) {
-    if (lv > 14) return "A+";
+    if (lv > 14) return "\u2605"; // star for passed A
     return RANKS[lv - 2] || "2";
   }
 
@@ -1878,24 +1878,80 @@ color: #fff; gap: 10px;
     var winnerIsA = (first % 2 === 0);
     var partnerPos = fo.indexOf((first + 2) % 4);
     var upgrade = (partnerPos === 1) ? 3 : (partnerPos === 2) ? 2 : 1;
+
+    // A级必打规则：打A时，队友必须不是末游才算过A
+    var currentLevel = winnerIsA ? gameState.teamALevel : gameState.teamBLevel;
+    var passedA = false;
+
+    if (currentLevel === 14) {
+      // At A level: must have partner NOT be last (末游)
+      if (partnerPos < 3) {
+        // Partner is not last — passed A!
+        passedA = true;
+      } else {
+        // Partner is last — failed to pass A, no upgrade
+        upgrade = 0;
+      }
+    }
+
+    // Apply upgrade
     if (winnerIsA) {
-      gameState.teamALevel = Math.min(14, gameState.teamALevel + upgrade);
+      gameState.teamALevel = Math.min(15, gameState.teamALevel + upgrade);
       gameState.level = gameState.teamALevel;
     } else {
-      gameState.teamBLevel = Math.min(14, gameState.teamBLevel + upgrade);
+      gameState.teamBLevel = Math.min(15, gameState.teamBLevel + upgrade);
       gameState.level = gameState.teamBLevel;
     }
+
+    // Check for game victory (passed A, level > 14)
+    var gameOver = false;
+    var gameWinnerIsA = false;
+    if (gameState.teamALevel > 14) { gameOver = true; gameWinnerIsA = true; }
+    if (gameState.teamBLevel > 14) { gameOver = true; gameWinnerIsA = false; }
+
     playSound(winnerIsA ? "win" : "pass");
+
     var posNames = ["\u5934\u6e38", "\u4e8c\u6e38", "\u4e09\u6e38", "\u672b\u6e38"];
     var resultLines = "";
     for (var i = 0; i < fo.length; i++) {
       resultLines += posNames[i] + ": " + SEAT_NAMES[fo[i]];
       if (i < fo.length - 1) resultLines += "<br>";
     }
-    document.getElementById("resultTitle").textContent = winnerIsA ? "\ud83c\udf89 \u6211\u65b9\u83b7\u80dc\uff01" : "\ud83d\ude1e \u5bf9\u65b9\u83b7\u80dc";
-    document.getElementById("resultInfo").innerHTML = resultLines + "<br><br>" +
-      (winnerIsA ? "\u6211\u65b9" : "\u5bf9\u65b9") + "\u5347" + upgrade + "\u7ea7<br>" +
-      "\u6211\u65b9: " + levelName(gameState.teamALevel) + " | \u5bf9\u65b9: " + levelName(gameState.teamBLevel);
+
+    if (gameOver) {
+      // GAME OVER — someone passed A!
+      if (gameWinnerIsA) {
+        document.getElementById("resultTitle").textContent = "\ud83c\udfc6 \u606d\u559c\uff01\u6211\u65b9\u83b7\u5f97\u6700\u7ec8\u80dc\u5229\uff01";
+        // 恭喜！我方获得最终胜利！
+      } else {
+        document.getElementById("resultTitle").textContent = "\ud83d\ude22 \u5bf9\u65b9\u83b7\u5f97\u6700\u7ec8\u80dc\u5229";
+        // 对方获得最终胜利
+      }
+      document.getElementById("resultInfo").innerHTML = resultLines + "<br><br>" +
+        (gameWinnerIsA ? "\u6211\u65b9" : "\u5bf9\u65b9") + "\u6210\u529f\u6253\u8fc7A\uff01<br><br>" +
+        "\u6e38\u620f\u7ed3\u675f\uff0c\u91cd\u65b0\u5f00\u59cb";
+        // 成功打过A！ 游戏结束，重新开始
+      document.getElementById("btnNext").textContent = "\u91cd\u65b0\u5f00\u59cb";
+      // 重新开始
+      gameState.teamALevel = 2;
+      gameState.teamBLevel = 2;
+      gameState.level = 2;
+    } else {
+      // Normal round end
+      document.getElementById("resultTitle").textContent = winnerIsA ? "\ud83c\udf89 \u6211\u65b9\u83b7\u80dc\uff01" : "\ud83d\ude1e \u5bf9\u65b9\u83b7\u80dc";
+      var upgradeText = "";
+      if (upgrade > 0) {
+        upgradeText = (winnerIsA ? "\u6211\u65b9" : "\u5bf9\u65b9") + "\u5347" + upgrade + "\u7ea7";
+      } else {
+        upgradeText = "\u6253A\u5931\u8d25\uff0c\u672a\u80fd\u8fc7A";
+        // 打A失败，未能过A
+      }
+      document.getElementById("resultInfo").innerHTML = resultLines + "<br><br>" +
+        upgradeText + "<br>" +
+        "\u6211\u65b9: " + levelName(gameState.teamALevel) + " | \u5bf9\u65b9: " + levelName(gameState.teamBLevel);
+      document.getElementById("btnNext").textContent = "\u4e0b\u4e00\u5c40";
+      // 下一局
+    }
     document.getElementById("overlay").classList.remove("hidden");
   }
 
