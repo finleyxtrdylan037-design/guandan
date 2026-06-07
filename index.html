@@ -4,7 +4,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>掼蛋</title>
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="gd-version" content="v7.20260606.1115">
+<title>掼蛋 v7.20260606.1115</title>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <style>
 *, *::before, *::after {
   margin: 0; padding: 0; box-sizing: border-box;
@@ -207,6 +212,34 @@ color: #fff; gap: 10px;
 .overlay .game-btn { margin-top: 10px; }
 .overlay.hidden { display: none; }
 
+
+/* === GD ONLINE MENU === */
+.gd-menu {
+position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center;
+background: radial-gradient(circle at 50% 20%, rgba(54,122,77,0.96), rgba(8,29,17,0.98)); color:#fff;
+}
+.gd-menu.hidden { display:none; }
+.gd-panel { width:min(92vw,420px); max-height:92vh; overflow:auto; background:rgba(0,0,0,0.42); border:1px solid rgba(232,184,73,0.45); border-radius:18px; padding:18px; box-shadow:0 12px 40px rgba(0,0,0,0.45); }
+.gd-panel h1 { color:#e8b849; font-size:24px; text-align:center; margin-bottom:12px; }
+.gd-version { display:inline-block; margin-left:8px; padding:2px 6px; border-radius:999px; background:rgba(232,184,73,.18); border:1px solid rgba(232,184,73,.45); color:#ffd76a; font-size:11px; vertical-align:middle; }
+.gd-top-version { color:#ffd76a; font-size:11px; opacity:.9; }
+.gd-panel h2 { color:#e8b849; font-size:18px; margin:8px 0; }
+.gd-row { display:flex; gap:8px; margin:8px 0; align-items:center; }
+.gd-row input, .gd-row select { flex:1; padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,0.25); background:rgba(255,255,255,0.08); color:#fff; }
+.gd-row select option { color:#111; }
+.gd-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.gd-wide { grid-column:1 / -1; }
+.gd-menu-btn { padding:10px 12px; border:0; border-radius:12px; font-weight:bold; background:linear-gradient(135deg,#e8b849,#d4a03c); color:#1a1a2e; }
+.gd-menu-btn.secondary { background:rgba(255,255,255,0.14); color:#fff; border:1px solid rgba(255,255,255,0.22); }
+.gd-menu-btn:disabled { opacity:.45; }
+.gd-list { margin-top:8px; display:flex; flex-direction:column; gap:6px; }
+.gd-room-item { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:9px 10px; border-radius:12px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); }
+.gd-room-item span { font-size:13px; }
+.gd-small { color:#ddd; font-size:12px; line-height:1.5; margin-top:8px; }
+.gd-status { min-height:20px; color:#e8b849; font-size:13px; margin:8px 0; }
+.gd-seat-list { display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:13px; margin:10px 0; }
+.gd-seat-list div { background:rgba(255,255,255,0.08); padding:8px; border-radius:10px; }
+
 /* === RESPONSIVE === */
 @media (max-width: 400px) {
 .player-card { width: 36px; height: 54px; }
@@ -219,10 +252,39 @@ color: #fff; gap: 10px;
 
 </head>
 <body>
+<div class="gd-menu" id="gdMenu">
+  <div class="gd-panel" id="gdPanelMain">
+    <h1>掼蛋 <span class="gd-version">v7.20260606.1115</span></h1>
+    <div class="gd-row"><input id="gdName" maxlength="8" placeholder="系统分配玩家名" readonly></div>
+    <div class="gd-row"><button class="gd-menu-btn secondary gd-wide" id="gdNewPlayerName" type="button">申请新的玩家名字</button></div>
+    <div class="gd-grid">
+      <button class="gd-menu-btn gd-wide" id="gdSingle" type="button">单机版本</button>
+    </div>
+    <div class="gd-small">联机模式复用三人斗地主的 PeerJS 信令骨架；掼蛋固定 4 个座位，电脑只在房主端运行。</div>
+  </div>
+  <div class="gd-panel hidden" id="gdPanelHost">
+    <h2>创建联机房间</h2>
+    <div class="gd-row"><select id="gdRoomMode"><option value="online4">4人联机</option><option value="online3ai">3人 + 电脑</option><option value="online2aiSame">2人同一方 + 电脑</option><option value="online2aiDiff">2人不同方 + 电脑</option></select></div>
+    <div class="gd-row"><button class="gd-menu-btn" id="gdCreateRoom" type="button">创建房间</button><button class="gd-menu-btn secondary" id="gdHostBack" type="button">返回</button></div>
+    <div class="gd-status" id="gdHostStatus"></div>
+    <div class="gd-seat-list" id="gdHostSeats"></div>
+    <div class="gd-row"><button class="gd-menu-btn gd-wide" id="gdHostStart" type="button" disabled>开始游戏</button></div>
+  </div>
+  <div class="gd-panel hidden" id="gdPanelJoin">
+    <h2>加入房间</h2>
+    <div class="gd-row"><input id="gdRoomCodeInput" inputmode="numeric" placeholder="房间号 1-5"><button class="gd-menu-btn" id="gdJoinRoom" type="button">加入</button></div>
+    <div class="gd-row"><button class="gd-menu-btn secondary" id="gdRefreshRooms" type="button">刷新房间</button><button class="gd-menu-btn secondary" id="gdJoinBack" type="button">返回</button></div>
+    <div class="gd-row"><button class="gd-menu-btn gd-wide secondary hidden" id="gdReconnectLast" type="button">重连上次房间</button></div>
+    <div class="gd-status" id="gdJoinStatus"></div>
+    <div class="gd-list" id="gdRoomList"></div>
+  </div>
+</div>
+
 <div id="game">
   <div class="top-bar">
     <span id="levelInfo">级牌: 2</span>
     <span id="teamScore">我方 2 | 对方 2</span>
+    <span class="gd-top-version" id="gdVersionTag">v7.20260606.1115</span>
     <span id="turnInfo">等待...</span>
   </div>
   <div class="play-area">
@@ -266,6 +328,8 @@ color: #fff; gap: 10px;
 <script>
 (function() {
   "use strict";
+  var GD_VERSION = "v7.20260606.1115";
+  window.GD_VERSION = GD_VERSION;
 
   // ==================== SOUND ====================
   var audioCtx = null;
@@ -363,6 +427,459 @@ color: #fff; gap: 10px;
     consecutivePasses: 0, lastPlayedBy: -1, isFirstPlay: true,
     playedCards: [] // memory of all cards played this round
   };
+
+  try {
+    console.log("[掼蛋版本] " + GD_VERSION);
+    var oldVer = localStorage.getItem("gd_app_version");
+    if (oldVer !== GD_VERSION) localStorage.setItem("gd_app_version", GD_VERSION);
+  } catch(e) {}
+
+  // ==================== ONLINE ADAPTER (PeerJS, from Dou Dizhu shell, 4-seat Guandan) ====================
+  var CONFIG = {
+    peerServer: { host: "fungame114514.site", port: 443, secure: true, path: "/", key: "peerjs" },
+    fallbackServers: [{ host: "1.peerjs.com", port: 443, secure: true, path: "/", key: "peerjs" }],
+    iceServers: [
+      { urls: "stun:stun.miwifi.com:3478" },
+      { urls: "stun:stun.qq.com:3478" },
+      { urls: "stun:stun.l.google.com:19302" }
+    ],
+    roomCodePrefix: "gd-",
+    statusCodePrefix: "gd-info-",
+    fixedRooms: ["1","2","3","4","5"],
+    connectTimeout: 12000,
+    heartbeatInterval: 5000,
+    disconnectTimeout: 15000,
+    reconnectMaxAttempts: 5,
+    reconnectBackoff: [1000, 2000, 3000, 5000, 8000]
+  };
+
+  var Net = {
+    mode: null, roomMode: "single", mySeat: 0,
+    hostPeer: null, hostStatusPeer: null, hostRoomCode: null, hostGuests: {}, hostExpected: 1,
+    hostJoinedNames: ["你", null, null, null], seatTypes: ["human","ai","ai","ai"], hostServerIdx: -1, hostDisconnectTimers: {}, hostPlayerSeq: 1, hostDeviceSeats: {},
+    guestPeer: null, guestConn: null, guestSeatIdx: -1, guestRoomCode: null, guestHB: null, guestReconnectAttempt: 0, suppressGuestClose: false,
+    suppressSync: false,
+    toast: function(msg){ showMsg(msg); }
+  };
+  window.Net = Net;
+
+  var MODE_TEXT = {
+    single:"单机版本",
+    online4:"4人联机",
+    online3ai:"3人+电脑",
+    online2aiSame:"2人同一方+电脑",
+    online2aiDiff:"2人不同方+电脑"
+  };
+  function expectedByMode(mode){ return mode === "online4" ? 4 : (mode === "online3ai" ? 3 : ((mode === "online2aiSame" || mode === "online2aiDiff") ? 2 : 1)); }
+  function seatTypesByMode(mode){
+    if (mode === "online4") return ["human","human","human","human"];
+    if (mode === "online3ai") return ["human","human","human","ai"];
+    if (mode === "online2aiSame") return ["human","ai","human","ai"]; // 房主0号，客人2号，二人同一方
+    if (mode === "online2aiDiff") return ["human","human","ai","ai"]; // 房主0号，客人1号，二人不同方
+    return ["human","ai","ai","ai"];
+  }
+  function intendedHumanSeat(seat){
+    var base = seatTypesByMode(Net.roomMode);
+    return base && base[seat] === "human";
+  }
+  function isTakeoverSeat(seat){
+    return Net.seatTypes && Net.seatTypes[seat] === "ai" && /^电脑接管/.test(Net.hostJoinedNames[seat] || "");
+  }
+  function isAISeat(seat){ return Net.seatTypes && Net.seatTypes[seat] === "ai"; }
+  function pad2(n){ return String(n).padStart(2, "0"); }
+  function validPlayerName(v){ return /^玩家\d{2}$/.test(v || ""); }
+  function setStoredPlayerName(v){
+    if (!validPlayerName(v)) return;
+    try { localStorage.setItem("gd_name", v); } catch(e){}
+    var el = document.getElementById("gdName"); if (el) el.value = v;
+  }
+  function getDeviceId(){
+    var id = "";
+    try { id = localStorage.getItem("gd_device_id") || ""; } catch(e){}
+    if (!id) {
+      id = "gddev-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
+      try { localStorage.setItem("gd_device_id", id); } catch(e){}
+    }
+    return id;
+  }
+  function getMyName(){
+    var v = "";
+    try { v = localStorage.getItem("gd_name") || ""; } catch(e){}
+    if (!validPlayerName(v)) { v = "玩家01"; setStoredPlayerName(v); }
+    var el = document.getElementById("gdName"); if (el) el.value = v;
+    return v;
+  }
+  function requestNewPlayerName(){
+    var cur = getMyName();
+    var n = parseInt(cur.slice(2), 10) || 0;
+    n = n >= 99 ? 1 : n + 1;
+    setStoredPlayerName("玩家" + pad2(n));
+    try { localStorage.setItem("gd_device_id", "gddev-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8)); } catch(e){}
+    showMsg("已申请新的玩家名字：" + getMyName());
+  }
+  function nextHostPlayerName(){
+    var used = {};
+    for (var i = 0; i < 4; i++) if (validPlayerName(Net.hostJoinedNames[i])) used[Net.hostJoinedNames[i]] = true;
+    for (var n = 1; n <= 99; n++) {
+      var name = "玩家" + pad2(n);
+      if (!used[name]) return name;
+    }
+    return "玩家99";
+  }
+  function setSeatNameMap(names, types){
+    names = names || [];
+    types = types || Net.seatTypes;
+    for (var i = 0; i < 4; i++) {
+      SEAT_NAMES[i] = names[i] || (types[i] === "ai" ? "电脑" + (i + 1) : "玩家" + (i + 1));
+    }
+    if (Net.mode === "guest") SEAT_NAMES[0] = "你";
+    if (Net.mode === "host" || Net.mode === "single") SEAT_NAMES[0] = "你";
+    updateSeatNameTags();
+  }
+  function updateSeatNameTags(){
+    var map = [null, ".player-zone.pos-right .name-tag", ".player-zone.pos-top .name-tag", ".player-zone.pos-left .name-tag"];
+    for (var i = 1; i <= 3; i++) {
+      var el = document.querySelector(map[i]);
+      if (el) el.textContent = SEAT_NAMES[i];
+    }
+  }
+  function clonePlain(obj){ return JSON.parse(JSON.stringify(obj)); }
+  function makeHiddenCards(n){ var a = []; for (var i = 0; i < n; i++) a.push({ rank:"?", suit:"", id:"hidden-" + i }); return a; }
+  function rotateIdx(i, k){ return (i - k + 4) % 4; }
+  function unrotateIdx(i, k){ return (i + k) % 4; }
+  function rotateStateForGuest(raw, guestSeat){
+    var st = clonePlain(raw), nh = [[],[],[],[]], nlp = [null,null,null,null];
+    for (var i = 0; i < 4; i++) {
+      nh[rotateIdx(i, guestSeat)] = st.hands[i];
+      nlp[rotateIdx(i, guestSeat)] = st.lastPlays[i];
+    }
+    st.hands = nh; st.lastPlays = nlp;
+    st.currentPlayer = rotateIdx(st.currentPlayer, guestSeat);
+    st.lastPlayedBy = st.lastPlayedBy >= 0 ? rotateIdx(st.lastPlayedBy, guestSeat) : -1;
+    if (st.currentTrick && typeof st.currentTrick.player === "number") st.currentTrick.player = rotateIdx(st.currentTrick.player, guestSeat);
+    if (st.finishOrder) for (var f = 0; f < st.finishOrder.length; f++) st.finishOrder[f] = rotateIdx(st.finishOrder[f], guestSeat);
+    if (st.playedCards) for (var p = 0; p < st.playedCards.length; p++) st.playedCards[p].seat = rotateIdx(st.playedCards[p].seat, guestSeat);
+    return st;
+  }
+  function rotateNamesForGuest(names, guestSeat){
+    var out = [null,null,null,null];
+    for (var i = 0; i < 4; i++) out[rotateIdx(i, guestSeat)] = names[i];
+    out[0] = "你";
+    return out;
+  }
+  function buildRawStateForSeat(seat){
+    var raw = clonePlain(gameState);
+    raw.__ui = {
+      resultTitle: (document.getElementById("resultTitle") || {}).textContent || "",
+      resultInfo: (document.getElementById("resultInfo") || {}).innerHTML || "",
+      resultButton: (document.getElementById("btnNext") || {}).textContent || "下一局"
+    };
+    for (var i = 0; i < 4; i++) if (i !== seat) raw.hands[i] = makeHiddenCards(gameState.hands[i].length);
+    return raw;
+  }
+  function applyState(state){
+    var ui = state && state.__ui ? state.__ui : null;
+    Net.suppressSync = true;
+    for (var k in state) if (state.hasOwnProperty(k) && k !== "__ui") gameState[k] = state[k];
+    Net.suppressSync = false;
+    updateUI();
+    if (gameState.roundActive) {
+      // 联机客人收到房主“下一局/新一局”状态时，必须主动关闭上一局结果弹窗；
+      // 否则客人会停留在“下一局”遮罩上，看起来像卡死。
+      document.getElementById("overlay").classList.add("hidden");
+    } else {
+      if (ui) {
+        document.getElementById("resultTitle").textContent = ui.resultTitle || "本局结束";
+        document.getElementById("resultInfo").innerHTML = ui.resultInfo || "等待房主开下一局";
+        document.getElementById("btnNext").textContent = ui.resultButton || "下一局";
+      }
+      document.getElementById("overlay").classList.remove("hidden");
+    }
+  }
+  function serializeForGuest(seat){ return rotateStateForGuest(buildRawStateForSeat(seat), seat); }
+  function sendStateToGuest(seat){
+    var g = Net.hostGuests[seat]; if (!g || !g.conn || !g.alive) return;
+    try { g.conn.send({ type:"state", assignedName:Net.hostJoinedNames[seat], state: serializeForGuest(seat), names: rotateNamesForGuest(Net.hostJoinedNames, seat), seatTypes: rotateNamesForGuest(Net.seatTypes, seat) }); } catch(e){}
+  }
+  function broadcastState(){
+    if (Net.mode !== "host") return;
+    for (var s = 1; s <= 3; s++) sendStateToGuest(s);
+    updateHostStatusPeer();
+  }
+  function afterStateChange(){ if (Net.mode === "host" && !Net.suppressSync) broadcastState(); }
+  function buildPeerOptions(){
+    var srv = (Net.hostServerIdx >= 0 && CONFIG.fallbackServers[Net.hostServerIdx]) ? CONFIG.fallbackServers[Net.hostServerIdx] : CONFIG.peerServer;
+    return { debug: 1, config: { iceServers: CONFIG.iceServers }, host: srv.host, port: srv.port, secure: srv.secure, path: srv.path, key: srv.key };
+  }
+  function genRoomCode(){ var a = CONFIG.fixedRooms; return CONFIG.roomCodePrefix + a[Math.floor(Math.random() * a.length)]; }
+  function listRooms(cb){
+    var c = CONFIG.peerServer, proto = c.secure ? "https" : "http", port = "";
+    if (!(c.secure && c.port === 443) && !(!c.secure && c.port === 80)) port = ":" + c.port;
+    var path = (c.path || "/"); if (path.charAt(0) !== "/") path = "/" + path; while (path.length > 1 && path.charAt(path.length - 1) === "/") path = path.slice(0, -1);
+    var url = proto + "://" + c.host + port + (path === "/" ? "" : path) + "/" + c.key + "/peers";
+    var xhr = new XMLHttpRequest(); xhr.open("GET", url, true); xhr.timeout = 5000;
+    xhr.onload = function(){
+      if (xhr.status === 401 || xhr.status === 403) { cb(new Error("服务器未启用 allow_discovery")); return; }
+      if (xhr.status < 200 || xhr.status >= 300) { cb(new Error("HTTP " + xhr.status)); return; }
+      try {
+        var data = JSON.parse(xhr.responseText), rooms = {}, status = {}, fixed = CONFIG.fixedRooms;
+        for (var i = 0; i < data.length; i++) {
+          var id = data[i]; if (typeof id !== "string") continue;
+          var m = id.match(/^gd-([1-5])$/); if (m) rooms[m[1]] = { code:m[1], roomCode:id, exists:true };
+          var sm = id.match(/^gd-info-([1-5])-(\d+)-(\d+)-([A-Za-z0-9]+)$/); if (sm) status[sm[1]] = { joined:+sm[2], expected:+sm[3], mode:sm[4] };
+        }
+        var out = [];
+        for (var j = 0; j < fixed.length; j++) { var code = fixed[j], r = rooms[code] || { code:code, roomCode:"gd-"+code, exists:false }; if (status[code]) { r.joined=status[code].joined; r.expected=status[code].expected; r.mode=status[code].mode; } out.push(r); }
+        cb(null, out);
+      } catch(e){ cb(e); }
+    };
+    xhr.onerror = function(){ cb(new Error("网络错误")); }; xhr.ontimeout = function(){ cb(new Error("请求超时")); }; xhr.send();
+  }
+  function cleanupNetwork(){
+    try { if (Net.guestHB) clearInterval(Net.guestHB); } catch(e){}
+    try { if (Net.guestConn) Net.guestConn.close(); } catch(e){}
+    try { if (Net.guestPeer) Net.guestPeer.destroy(); } catch(e){}
+    try { if (Net.hostStatusPeer) Net.hostStatusPeer.destroy(); } catch(e){}
+    try { if (Net.hostPeer) Net.hostPeer.destroy(); } catch(e){}
+    try { for (var ds in Net.hostDisconnectTimers) clearTimeout(Net.hostDisconnectTimers[ds]); } catch(e){}
+    Net.hostPeer = Net.hostStatusPeer = Net.guestPeer = Net.guestConn = null; Net.hostGuests = {}; Net.guestHB = null; Net.hostDisconnectTimers = {}; Net.hostDeviceSeats = {}; Net.hostPlayerSeq = 1; Net.guestReconnectAttempt = 0; Net.suppressGuestClose = false; hideReconnectBanner();
+  }
+  function joinedHumanCount(){ var n = 1; for (var s = 1; s <= 3; s++) if (Net.hostGuests[s] && Net.hostGuests[s].alive !== false) n++; return n; }
+  function updateHostStatusPeer(){
+    if (Net.mode !== "host" || !Net.hostRoomCode || typeof Peer === "undefined") return;
+    var code = Net.hostRoomCode.replace(CONFIG.roomCodePrefix, ""), joined = joinedHumanCount();
+    var id = CONFIG.statusCodePrefix + code + "-" + joined + "-" + Net.hostExpected + "-" + Net.roomMode;
+    try { if (Net.hostStatusPeer) Net.hostStatusPeer.destroy(); } catch(e){}
+    Net.hostStatusPeer = null;
+    try { Net.hostStatusPeer = new Peer(id, buildPeerOptions()); Net.hostStatusPeer.on("error", function(){}); } catch(e){}
+  }
+  function refreshHostSeats(){
+    var el = document.getElementById("gdHostSeats"); if (!el) return;
+    var html = "";
+    for (var i = 0; i < 4; i++) html += "<div>" + (i + 1) + "号：" + (Net.hostJoinedNames[i] || (Net.seatTypes[i] === "ai" ? "电脑" : "等待")) + "</div>";
+    el.innerHTML = html;
+    var btn = document.getElementById("gdHostStart"); if (btn) btn.disabled = joinedHumanCount() < Net.hostExpected;
+  }
+  function setHostStatus(msg){ var el = document.getElementById("gdHostStatus"); if (el) el.textContent = msg; }
+  function broadcastLobbyInfo(){
+    for (var s = 1; s <= 3; s++) {
+      var g = Net.hostGuests[s]; if (!g || !g.conn) continue;
+      try { g.conn.send({ type:"lobbyInfo", mySeat:s, assignedName:Net.hostJoinedNames[s], roomMode:Net.roomMode, expected:Net.hostExpected, names:rotateNamesForGuest(Net.hostJoinedNames, s), seatTypes:rotateNamesForGuest(Net.seatTypes, s), roomCode:Net.hostRoomCode }); } catch(e){}
+    }
+  }
+  function assignSeat(){
+    for (var s = 1; s < 4; s++) {
+      // 按“房间模式的原始真人座位”分配，而不是按当前 seatTypes 分配。
+      // 断线超时后 seatTypes[seat] 会临时变成 ai 让电脑接管出牌，
+      // 但这个座位仍然是该模式下允许真人重连回来的座位。
+      if (!intendedHumanSeat(s)) continue;
+      if (!Net.hostGuests[s] || Net.hostGuests[s].alive === false || isTakeoverSeat(s)) return s;
+    }
+    return -1;
+  }
+  function startHost(mode){
+    if (typeof Peer === "undefined") { setHostStatus("PeerJS 没加载成功"); return; }
+    cleanupNetwork(); Net.mode = "host"; Net.roomMode = mode; Net.mySeat = 0; Net.hostExpected = expectedByMode(mode); Net.seatTypes = seatTypesByMode(mode); setStoredPlayerName("玩家01"); Net.hostJoinedNames = [getMyName(), null, null, null]; Net.hostDeviceSeats[getDeviceId()] = 0;
+    for (var i = 0; i < 4; i++) if (Net.seatTypes[i] === "ai") Net.hostJoinedNames[i] = "电脑" + (i + 1);
+    setSeatNameMap(Net.hostJoinedNames, Net.seatTypes); refreshHostSeats(); setHostStatus("正在连接信令服务器...");
+    var roomCode = genRoomCode(); Net.hostRoomCode = roomCode;
+    Net.hostPeer = new Peer(roomCode, buildPeerOptions());
+    var timer = setTimeout(function(){ if (Net.hostPeer && !Net.hostPeer.open) setHostStatus("连接超时，请检查信令服务器"); }, CONFIG.connectTimeout);
+    Net.hostPeer.on("open", function(id){ clearTimeout(timer); Net.hostRoomCode = id; try { localStorage.setItem("gd_last_room", id); } catch(e){} setHostStatus("房间号：" + id.replace("gd-", "") + "，模式：" + MODE_TEXT[mode] + "，已加入 " + joinedHumanCount() + "/" + Net.hostExpected); updateHostStatusPeer(); refreshHostSeats(); });
+    Net.hostPeer.on("connection", function(conn){
+      conn.on("open", function(){
+        var seat = assignSeat();
+        if (seat < 0) { try { conn.send({ type:"kick", reason:"房间已满" }); } catch(e){} setTimeout(function(){ try { conn.close(); } catch(e){} }, 200); return; }
+        if (Net.hostDisconnectTimers[seat]) { clearTimeout(Net.hostDisconnectTimers[seat]); delete Net.hostDisconnectTimers[seat]; }
+        var oldName = validPlayerName(Net.hostJoinedNames[seat]) ? Net.hostJoinedNames[seat] : "";
+        Net.seatTypes[seat] = "human";
+        Net.hostGuests[seat] = { conn:conn, alive:true, name:oldName, deviceId:null, lastSeen:Date.now() };
+        conn.on("data", function(msg){ handleHostMessage(seat, msg); });
+        conn.on("close", function(){ handleGuestDisconnect(seat); });
+        conn.on("error", function(){});
+        conn.send({ type:"welcome", mySeat:seat });
+        refreshHostSeats(); broadcastLobbyInfo(); updateHostStatusPeer();
+        if (gameState.roundActive) setTimeout(function(){ sendStateToGuest(seat); }, 200);
+      });
+    });
+    Net.hostPeer.on("error", function(err){ setHostStatus("建房失败：" + ((err && err.type) || err)); });
+  }
+  function handleGuestDisconnect(seat){
+    var g = Net.hostGuests[seat];
+    if (!g) return;
+    g.alive = false;
+    if (gameState.roundActive) {
+      // 和斗地主一样：游戏中先保留真人座位，给玩家重连窗口。
+      // 不能立刻把 seatTypes 改成 ai，否则重连回来会被托管自动出牌。
+      Net.toast("玩家 " + (g.name || (seat + 1)) + " 掉线，等待重连...");
+      if (Net.hostDisconnectTimers[seat]) clearTimeout(Net.hostDisconnectTimers[seat]);
+      Net.hostDisconnectTimers[seat] = setTimeout(function(){
+        if (Net.hostGuests[seat] && Net.hostGuests[seat].alive === false) {
+          delete Net.hostGuests[seat];
+          delete Net.hostDisconnectTimers[seat];
+          Net.seatTypes[seat] = "ai";
+          Net.hostJoinedNames[seat] = "电脑接管" + (seat + 1);
+          refreshHostSeats(); broadcastLobbyInfo(); updateHostStatusPeer(); broadcastState();
+          if (gameState.currentPlayer === seat) setTimeout(aiTurn, 400);
+        }
+      }, CONFIG.disconnectTimeout);
+    } else {
+      delete Net.hostGuests[seat];
+      Net.hostJoinedNames[seat] = null;
+      refreshHostSeats(); broadcastLobbyInfo(); updateHostStatusPeer();
+    }
+  }
+  function handleHostMessage(seat, msg){
+    if (!msg || typeof msg !== "object") return;
+    var g = Net.hostGuests[seat]; if (g) g.lastSeen = Date.now();
+    if (msg.type === "join") {
+      var dev = String(msg.deviceId || "");
+      var assigned = (g && validPlayerName(g.name)) ? g.name : "";
+      if (dev && Net.hostDeviceSeats[dev] != null && validPlayerName(Net.hostJoinedNames[Net.hostDeviceSeats[dev]])) assigned = Net.hostJoinedNames[Net.hostDeviceSeats[dev]];
+      if (!assigned) assigned = nextHostPlayerName();
+      if (g) { g.name = assigned; g.deviceId = dev; g.alive = true; }
+      if (dev) Net.hostDeviceSeats[dev] = seat;
+      Net.seatTypes[seat] = "human"; Net.hostJoinedNames[seat] = assigned;
+      try { Net.hostGuests[seat].conn.send({ type:"welcome", mySeat:seat, assignedName:assigned }); } catch(e){}
+      refreshHostSeats(); broadcastLobbyInfo(); updateHostStatusPeer(); setHostStatus("房间号：" + Net.hostRoomCode.replace("gd-", "") + "，已加入 " + joinedHumanCount() + "/" + Net.hostExpected); if (gameState.roundActive) setTimeout(function(){ sendStateToGuest(seat); }, 100); return; }
+    if (msg.type === "__ping") { try { Net.hostGuests[seat].conn.send({ type:"__pong" }); } catch(e){} return; }
+    if (!gameState.roundActive || gameState.currentPlayer !== seat) { try { Net.hostGuests[seat].conn.send({ type:"toast", msg:"还没轮到你" }); } catch(e){} return; }
+    if (msg.type === "pass") { if (gameState.isFirstPlay || !gameState.currentTrick) return; executePlay(seat, null); return; }
+    if (msg.type === "play") {
+      var play = buildPlayFromIds(seat, msg.cardIds || []);
+      if (!play) { try { Net.hostGuests[seat].conn.send({ type:"toast", msg:"无效牌型" }); } catch(e){} return; }
+      executePlay(seat, play);
+    }
+  }
+  function buildPlayFromIds(seat, ids){
+    if (!ids || !ids.length) return null;
+    var selected = [], idMap = {}; for (var x = 0; x < ids.length; x++) idMap[String(ids[x])] = true;
+    for (var i = 0; i < gameState.hands[seat].length; i++) if (idMap[String(gameState.hands[seat][i].id)]) selected.push(i);
+    if (selected.length !== ids.length) return null;
+    var cards = []; for (var j = 0; j < selected.length; j++) cards.push(gameState.hands[seat][selected[j]]);
+    var playType = detectType(cards); if (!playType) return null;
+    if (gameState.currentTrick && !canBeat(playType, gameState.currentTrick)) return null;
+    return { type:playType.type, rank:playType.rank, count:playType.count, indices:selected };
+  }
+  function startGuest(roomCode, name){
+    if (typeof Peer === "undefined") { document.getElementById("gdJoinStatus").textContent = "PeerJS 没加载成功"; return; }
+    cleanupNetwork(); Net.mode = "guest"; Net.roomMode = null; Net.guestRoomCode = roomCode.indexOf("gd-") === 0 ? roomCode : "gd-" + roomCode;
+    document.getElementById("gdJoinStatus").textContent = "正在加入 " + Net.guestRoomCode.replace("gd-", "") + "...";
+    Net.guestPeer = new Peer(undefined, buildPeerOptions());
+    Net.guestPeer.on("open", function(){
+      Net.guestConn = Net.guestPeer.connect(Net.guestRoomCode, { reliable:true });
+      Net.guestConn.on("open", function(){ Net.guestReconnectAttempt = 0; hideReconnectBanner(); Net.guestConn.send({ type:"join", name:name, deviceId:getDeviceId() }); Net.guestHB = setInterval(function(){ try { Net.guestConn.send({ type:"__ping" }); } catch(e){} }, CONFIG.heartbeatInterval); });
+      Net.guestConn.on("data", handleGuestMessage);
+      Net.guestConn.on("close", function(){ if (Net.suppressGuestClose) return; if (Net.guestHB) { clearInterval(Net.guestHB); Net.guestHB = null; } attemptGuestReconnect(Net.guestRoomCode, name); });
+      Net.guestConn.on("error", function(){ document.getElementById("gdJoinStatus").textContent = "加入失败"; });
+    });
+    Net.guestPeer.on("error", function(err){ document.getElementById("gdJoinStatus").textContent = "加入失败：" + ((err && err.type) || err); });
+  }
+  function attemptGuestReconnect(roomCode, name){
+    if (Net.mode !== "guest") return;
+    Net.guestReconnectAttempt = Net.guestReconnectAttempt || 0;
+    var attempt = Net.guestReconnectAttempt;
+    if (attempt >= CONFIG.reconnectMaxAttempts) {
+      showReconnectBanner("重连多次失败，请手动重新加入房间", true);
+      return;
+    }
+    var delay = CONFIG.reconnectBackoff[attempt] || 8000;
+    showReconnectBanner("与房主连接中断，" + Math.ceil(delay / 1000) + " 秒后重连...", false);
+    setTimeout(function(){
+      if (Net.mode !== "guest") return;
+      Net.guestReconnectAttempt = attempt + 1;
+      showReconnectBanner("重连中...", false);
+      try { if (Net.guestHB) clearInterval(Net.guestHB); } catch(e){}
+      Net.suppressGuestClose = true;
+      try { if (Net.guestConn) Net.guestConn.close(); } catch(e){}
+      try { if (Net.guestPeer) Net.guestPeer.destroy(); } catch(e){}
+      Net.suppressGuestClose = false;
+      Net.guestHB = null; Net.guestConn = null; Net.guestPeer = null;
+      tryGuestConnectForReconnect(roomCode, name);
+    }, delay);
+  }
+  function tryGuestConnectForReconnect(roomCode, name){
+    try { Net.guestPeer = new Peer(undefined, buildPeerOptions()); } catch(e){ attemptGuestReconnect(roomCode, name); return; }
+    var opened = false;
+    var timer = setTimeout(function(){ if (!opened) { try { Net.guestPeer.destroy(); } catch(e){} attemptGuestReconnect(roomCode, name); } }, CONFIG.connectTimeout);
+    Net.guestPeer.on("open", function(){
+      Net.guestConn = Net.guestPeer.connect(roomCode, { reliable:true });
+      Net.guestConn.on("open", function(){
+        opened = true; clearTimeout(timer); Net.guestReconnectAttempt = 0; hideReconnectBanner();
+        Net.guestConn.send({ type:"join", name:name, deviceId:getDeviceId(), reconnect:true });
+        Net.guestHB = setInterval(function(){ try { Net.guestConn.send({ type:"__ping" }); } catch(e){} }, CONFIG.heartbeatInterval);
+      });
+      Net.guestConn.on("data", handleGuestMessage);
+      Net.guestConn.on("close", function(){ if (Net.suppressGuestClose) return; if (Net.guestHB) { clearInterval(Net.guestHB); Net.guestHB = null; } attemptGuestReconnect(roomCode, name); });
+      Net.guestConn.on("error", function(){});
+    });
+    Net.guestPeer.on("error", function(){ clearTimeout(timer); attemptGuestReconnect(roomCode, name); });
+  }
+  function showReconnectBanner(text, isError){
+    var b = document.getElementById("gdReconnectBanner");
+    if (!b) { b = document.createElement("div"); b.id = "gdReconnectBanner"; document.body.appendChild(b); }
+    b.className = "gd-reconnect-banner" + (isError ? " err" : "");
+    b.textContent = text;
+  }
+  function hideReconnectBanner(){
+    var b = document.getElementById("gdReconnectBanner");
+    if (b && b.parentNode) b.parentNode.removeChild(b);
+  }
+  function handleGuestMessage(msg){
+    if (!msg || typeof msg !== "object") return;
+    if (msg.type === "kick") { document.getElementById("gdJoinStatus").textContent = msg.reason || "被房主移出"; return; }
+    if (msg.type === "welcome") { Net.guestSeatIdx = msg.mySeat; if (msg.assignedName) setStoredPlayerName(msg.assignedName); try { localStorage.setItem("gd_last_room", Net.guestRoomCode); } catch(e){} return; }
+    if (msg.type === "lobbyInfo") { Net.guestSeatIdx = msg.mySeat; if (msg.assignedName) setStoredPlayerName(msg.assignedName); Net.roomMode = msg.roomMode; Net.seatTypes = msg.seatTypes || Net.seatTypes; setSeatNameMap(msg.names, Net.seatTypes); document.getElementById("gdJoinStatus").textContent = "已加入房间 " + String(msg.roomCode || "").replace("gd-", "") + "，等待房主开始"; document.getElementById("gdMenu").classList.remove("hidden"); return; }
+    if (msg.type === "state") { if (msg.assignedName) setStoredPlayerName(msg.assignedName); Net.seatTypes = msg.seatTypes || Net.seatTypes; setSeatNameMap(msg.names, Net.seatTypes); document.getElementById("gdMenu").classList.add("hidden"); applyState(msg.state); return; }
+    if (msg.type === "toast") { showMsg(msg.msg || "操作失败"); return; }
+  }
+  function guestSendAction(type){
+    if (Net.mode !== "guest" || !Net.guestConn) return false;
+    if (type === "pass") { Net.guestConn.send({ type:"pass" }); showMsg("已发送，等待房主确认"); return true; }
+    var ids = [];
+    for (var i = 0; i < gameState.hands[0].length; i++) if (gameState.hands[0][i]._selected) ids.push(gameState.hands[0][i].id);
+    if (!ids.length) return true;
+    Net.guestConn.send({ type:"play", cardIds:ids }); showMsg("已发送，等待房主确认"); return true;
+  }
+  function initMenu(){
+    var nameEl = document.getElementById("gdName"); if (nameEl) { nameEl.readOnly = true; nameEl.value = getMyName(); } var newNameBtn = document.getElementById("gdNewPlayerName"); if (newNameBtn) newNameBtn.onclick = requestNewPlayerName;
+    function refreshReconnectButton(){
+      var rb = document.getElementById("gdReconnectLast"); if (!rb) return;
+      var last = ""; try { last = (localStorage.getItem("gd_last_room") || "").replace(CONFIG.roomCodePrefix, ""); } catch(e){}
+      rb.classList.toggle("hidden", !/^[1-5]$/.test(last));
+      rb.textContent = /^[1-5]$/.test(last) ? ("重连上次房间 " + last) : "重连上次房间";
+      rb.onclick = function(){ if (/^[1-5]$/.test(last)) startGuest(last, getMyName()); };
+    }
+    function showPanel(id){ ["gdPanelMain","gdPanelHost","gdPanelJoin"].forEach(function(pid){ var el=document.getElementById(pid); if(el) el.classList.toggle("hidden", pid!==id); }); if (id === "gdPanelJoin") refreshReconnectButton(); }
+    document.getElementById("gdSingle").onclick = function(){ cleanupNetwork(); Net.mode="single"; Net.roomMode="single"; Net.seatTypes=seatTypesByMode("single"); setSeatNameMap(["你","电脑B","对家","电脑D"], Net.seatTypes); document.getElementById("gdMenu").classList.add("hidden"); startRound(); };
+    var showHostBtn = document.getElementById("gdShowHost");
+    if (showHostBtn) showHostBtn.onclick = function(){ showPanel("gdPanelHost"); };
+    var showJoinBtn = document.getElementById("gdShowJoin");
+    if (showJoinBtn) showJoinBtn.onclick = function(){ showPanel("gdPanelJoin"); refreshRooms(); };
+    document.getElementById("gdHostBack").onclick = function(){ cleanupNetwork(); showPanel("gdPanelMain"); };
+    document.getElementById("gdJoinBack").onclick = function(){ cleanupNetwork(); showPanel("gdPanelMain"); };
+    document.getElementById("gdCreateRoom").onclick = function(){ startHost(document.getElementById("gdRoomMode").value); };
+    document.getElementById("gdHostStart").onclick = function(){ if (joinedHumanCount() >= Net.hostExpected) { document.getElementById("gdMenu").classList.add("hidden"); startRound(); } };
+    document.getElementById("gdJoinRoom").onclick = function(){ var code = document.getElementById("gdRoomCodeInput").value.replace(/\D/g, "").slice(0,1); if (!code) return; startGuest(code, getMyName()); };
+    document.getElementById("gdRefreshRooms").onclick = refreshRooms;
+  }
+  function refreshRooms(){
+    var st = document.getElementById("gdJoinStatus"), list = document.getElementById("gdRoomList"); if (!st || !list) return;
+    st.textContent = "正在刷新房间..."; list.innerHTML = "";
+    listRooms(function(err, rooms){
+      if (err) { st.textContent = "获取房间列表失败：" + err.message; return; }
+      st.textContent = "房间列表已刷新";
+      for (var i = 0; i < rooms.length; i++) (function(r){
+        var div = document.createElement("div"); div.className = "gd-room-item";
+        var txt = r.exists ? ((r.joined || 1) + "/" + (r.expected || 4) + " " + (MODE_TEXT[r.mode] || "联机房间")) : "空";
+        var full = r.exists && r.joined >= r.expected;
+        div.innerHTML = "<span>房间" + r.code + "　" + txt + "</span><button class='gd-menu-btn secondary' type='button' " + ((!r.exists || full) ? "disabled" : "") + ">加入</button>";
+        div.querySelector("button").onclick = function(){ startGuest(r.code, getMyName()); };
+        list.appendChild(div);
+      })(rooms[i]);
+    });
+  }
+
 
   // ==================== DECK ====================
   function createDeck() {
@@ -1823,7 +2340,7 @@ color: #fff; gap: 10px;
       else playSound("play");
       if (gameState.hands[seat].length === 0) {
         gameState.finishOrder.push(seat);
-        if (checkRoundEnd()) return;
+        if (checkRoundEnd()) { afterStateChange(); return; }
       }
     } else {
       gameState.lastPlays[seat] = "pass";
@@ -1844,13 +2361,15 @@ color: #fff; gap: 10px;
         }
         gameState.currentPlayer = leader;
         updateUI();
-        if (leader !== 0) setTimeout(aiTurn, 700);
+        afterStateChange();
+        if (isAISeat(leader)) setTimeout(aiTurn, 700);
         return;
       }
     }
     gameState.currentPlayer = nextSeat(seat);
     updateUI();
-    if (gameState.currentPlayer !== 0 && gameState.roundActive) setTimeout(aiTurn, 550);
+    afterStateChange();
+    if (isAISeat(gameState.currentPlayer) && gameState.roundActive) setTimeout(aiTurn, 550);
   }
 
   function checkRoundEnd() {
@@ -1956,12 +2475,13 @@ color: #fff; gap: 10px;
   }
 
   function aiTurn() {
-    if (!gameState.roundActive || gameState.currentPlayer === 0) return;
+    if (!gameState.roundActive || !isAISeat(gameState.currentPlayer)) return;
     executePlay(gameState.currentPlayer, aiPlay(gameState.currentPlayer));
   }
 
   // ==================== PLAYER ACTIONS ====================
   function doPlay() {
+    if (Net.mode === "guest") { guestSendAction("play"); return; }
     if (gameState.currentPlayer !== 0 || !gameState.roundActive) return;
     var selected = [];
     for (var i = 0; i < gameState.hands[0].length; i++) {
@@ -1978,6 +2498,7 @@ color: #fff; gap: 10px;
   }
 
   function doPass() {
+    if (Net.mode === "guest") { guestSendAction("pass"); return; }
     if (gameState.currentPlayer !== 0 || !gameState.roundActive || gameState.isFirstPlay) return;
     if (!gameState.currentTrick) { showMsg("\u5fc5\u987b\u51fa\u724c\uff01"); return; }
     for (var i = 0; i < gameState.hands[0].length; i++) gameState.hands[0][i]._selected = false;
@@ -2051,6 +2572,7 @@ color: #fff; gap: 10px;
   }
 
   function startRound() {
+    if (Net.mode === "guest") { showMsg("等待房主开始"); return; }
     deal();
     gameState.currentTrick = null;
     gameState.currentPlayer = 0;
@@ -2064,10 +2586,14 @@ color: #fff; gap: 10px;
     hintIndex = 0;
     document.getElementById("overlay").classList.add("hidden");
     updateUI();
-    if (gameState.currentPlayer !== 0) setTimeout(aiTurn, 700);
+    afterStateChange();
+    if (isAISeat(gameState.currentPlayer)) setTimeout(aiTurn, 700);
   }
 
-  function nextRound() { startRound(); }
+  function nextRound() {
+    if (Net.mode === "guest") { showMsg("等待房主开下一局"); return; }
+    startRound();
+  }
 
   // ==================== EVENT BINDINGS ====================
   document.getElementById("btnPlay").addEventListener("click", doPlay);
@@ -2077,7 +2603,19 @@ color: #fff; gap: 10px;
   document.getElementById("btnNext").addEventListener("click", nextRound);
 
   // ==================== START ====================
-  startRound();
+  window.__GD = {
+    gameState: gameState,
+    startRound: startRound,
+    executePlay: executePlay,
+    aiTurn: aiTurn,
+    updateUI: updateUI,
+    getState: function(){ return clonePlain(gameState); },
+    applyState: applyState,
+    getNet: function(){ return Net; }
+  };
+  initMenu();
+  setSeatNameMap(["你","电脑B","对家","电脑D"], seatTypesByMode("single"));
+  updateUI();
 
 })();
 </script>
